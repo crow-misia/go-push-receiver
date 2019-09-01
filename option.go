@@ -22,7 +22,7 @@ func (c withReceivedPersistentIds) Apply(client *FcmClient) {
 	client.receivedPersistentIds = c
 }
 
-// WithReceivedPersistentId is received persistentId list setter
+// WithReceivedPersistentIds is received persistentId list setter
 func WithReceivedPersistentIds(ids []string) Option {
 	return withReceivedPersistentIds(ids)
 }

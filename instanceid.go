@@ -77,7 +77,7 @@ func (c *FcmClient) checkIn(ctx context.Context, opt *checkInOption) (*pb.Androi
 
 	// unauthorized error
 	if response.StatusCode == http.StatusUnauthorized {
-		return nil, GcmAuthorizationError
+		return nil, ErrGcmAuthorization
 	}
 
 	data, err := ioutil.ReadAll(response.Body)

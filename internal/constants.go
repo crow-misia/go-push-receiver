@@ -5,6 +5,7 @@ package internal
 // TagType is FCM Request/Response Tag type
 type TagType byte
 
+// GCM / FCM constants.
 const (
 	RegisterUrl   = "https://android.clients.google.com/c2dm/register3"
 	CheckinUrl    = "https://android.clients.google.com/checkin"

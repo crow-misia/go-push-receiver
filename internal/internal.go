@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Retry backoff with jitter sleep to prevent overloaded conditions during intervals
+// RetryBackoff with jitter sleep to prevent overloaded conditions during intervals
 // https://www.awsarchitectureblog.com/2015/03/backoff.html
 func RetryBackoff(retry int, minBackoff, maxBackoff time.Duration) time.Duration {
 	if retry < 0 {
@@ -28,6 +28,7 @@ func RetryBackoff(retry int, minBackoff, maxBackoff time.Duration) time.Duration
 	return time.Duration(rand.Int63n(int64(backoff)))
 }
 
+// HTTPClient is http.Client wrapper.
 type HTTPClient struct {
 	Client *http.Client
 }

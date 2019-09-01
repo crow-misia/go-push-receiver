@@ -127,7 +127,7 @@ func (c *FcmClient) Connect(ctx context.Context) {
 			// reset retry count when connection success
 			c.retry = 0
 		} else {
-			if err == GcmAuthorizationError {
+			if err == ErrGcmAuthorization {
 				c.creds = nil
 			}
 
