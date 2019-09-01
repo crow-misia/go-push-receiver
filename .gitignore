@@ -32,9 +32,11 @@
 # auto-import.
 # .idea/modules.xml
 # .idea/*.iml
-# .idea/modules
+.idea/modules
 # *.iml
 # *.ipr
+.idea/misc.xml
+.idea/vcs.xml
 
 # CMake
 cmake-build-*/
@@ -155,5 +157,6 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# Firebase Service Account file for testing.
+# Files for testing.
 service_account.json
+credentials.json
