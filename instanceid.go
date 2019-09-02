@@ -34,7 +34,7 @@ func newCheckinOption(androidID uint64, securityToken uint64) *checkInOption {
 	}
 }
 
-func (c *FcmClient) registerGCM(ctx context.Context) (*gcmRegisterResponse, error) {
+func (c *Client) registerGCM(ctx context.Context) (*gcmRegisterResponse, error) {
 	checkInResp, err := c.checkIn(ctx, &checkInOption{})
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (c *FcmClient) registerGCM(ctx context.Context) (*gcmRegisterResponse, erro
 	return c.doRegister(ctx, *checkInResp.AndroidId, *checkInResp.SecurityToken)
 }
 
-func (c *FcmClient) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCheckinResponse, error) {
+func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCheckinResponse, error) {
 	id := int64(opt.androidID)
 	r := &pb.AndroidCheckinRequest{
 		Checkin: &pb.AndroidCheckinProto{
@@ -61,7 +61,6 @@ func (c *FcmClient) checkIn(ctx context.Context, opt *checkInOption) (*pb.Androi
 		SecurityToken:    &opt.securityToken,
 	}
 
-	httpClient := c.httpClient
 	message, err := proto.Marshal(r)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal GCM checkin request")
@@ -70,7 +69,7 @@ func (c *FcmClient) checkIn(ctx context.Context, opt *checkInOption) (*pb.Androi
 	req, _ := http.NewRequest("POST", internal.CheckinUrl, bytes.NewReader(message))
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
-	response, err := httpClient.Do(ctx, req)
+	response, err := c.httpClient.Do(req.WithContext(ctx))
 	if response == nil || err != nil {
 		return nil, errors.Wrap(err, "request GCM checkin")
 	}
@@ -94,7 +93,7 @@ func (c *FcmClient) checkIn(ctx context.Context, opt *checkInOption) (*pb.Androi
 	return &responseProto, nil
 }
 
-func (c *FcmClient) doRegister(ctx context.Context, androidID uint64, securityToken uint64) (*gcmRegisterResponse, error) {
+func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken uint64) (*gcmRegisterResponse, error) {
 	appID := fmt.Sprintf("wp:receiver.push.com#%s", uuid.New())
 
 	values := url.Values{}
@@ -109,7 +108,7 @@ func (c *FcmClient) doRegister(ctx context.Context, androidID uint64, securityTo
 	req.Header.Set("Authorization", fmt.Sprintf("AidLogin %d:%d", androidID, securityToken))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	response, err := httpClient.Do(ctx, req)
+	response, err := httpClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, errors.Wrap(err, "request GCM register")
 	}

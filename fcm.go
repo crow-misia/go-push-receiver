@@ -48,67 +48,62 @@ type fcmKeys struct {
 	authSecret []byte
 }
 
-// FcmClient is FCM Push receiver
-type FcmClient struct {
-	httpClient            *internal.HTTPClient
+// Client is FCM Push receive client.
+type Client struct {
+	httpClient            *http.Client
 	senderID              string
 	creds                 *FcmCredentials
 	onUpdateCreds         func(*FcmCredentials)
 	onMessage             func(string, []byte)
-	onError               func(error)
+	onError               func(error, time.Duration)
 	dialer                *net.Dialer
-	tlsConfig             *tls.Config
 	minRetryBackoff       time.Duration
 	maxRetryBackoff       time.Duration
 	retry                 int
 	receivedPersistentIds []string
 }
 
-// NewFcmClient creates FCMClient.
-func NewFcmClient(senderID string, config *Config, opts ...Option) *FcmClient {
+// NewClient creates FCM push receive client.
+func NewClient(senderID string, config *Config, opts ...Option) *Client {
 	config.init()
 
-	tlsConfig := tls.Config{
-		InsecureSkipVerify:       false,
-		PreferServerCipherSuites: true,
-		MinVersion:               tls.VersionTLS12,
-	}
-
-	client := &FcmClient{
+	c := &Client{
 		senderID:              senderID,
-		dialer:                config.Dialer,
-		httpClient:            &internal.HTTPClient{Client: config.HTTPClient},
-		tlsConfig:             &tlsConfig,
 		minRetryBackoff:       config.MinRetryBackoff,
 		maxRetryBackoff:       config.MaxRetryBackoff,
 		retry:                 0,
 		receivedPersistentIds: make([]string, 0),
+		httpClient:            http.DefaultClient,
+		dialer: &net.Dialer{
+			Timeout:   config.Timeout,
+			KeepAlive: config.Timeout,
+		},
 	}
 
 	for _, opt := range opts {
-		opt.Apply(client)
+		opt(c)
 	}
 
-	return client
+	return c
 }
 
 // SetOnUpdateCreds is FCM Credentials update callback setter.
-func (c *FcmClient) SetOnUpdateCreds(callback func(*FcmCredentials)) {
+func (c *Client) SetOnUpdateCreds(callback func(*FcmCredentials)) {
 	c.onUpdateCreds = callback
 }
 
 // SetOnError is FCM error callback setter.
-func (c *FcmClient) SetOnError(callback func(error)) {
+func (c *Client) SetOnError(callback func(error, time.Duration)) {
 	c.onError = callback
 }
 
 // SetOnMessage is FCM data receive callback setter.
-func (c *FcmClient) SetOnMessage(callback func(string, []byte)) {
+func (c *Client) SetOnMessage(callback func(string, []byte)) {
 	c.onMessage = callback
 }
 
 // Connect connect to FCM.
-func (c *FcmClient) Connect(ctx context.Context) {
+func (c *Client) Connect(ctx context.Context) {
 	for {
 		if ctx.Err() != nil {
 			return
@@ -119,20 +114,17 @@ func (c *FcmClient) Connect(ctx context.Context) {
 		} else {
 			options := newCheckinOption(c.creds.AndroidID, c.creds.SecurityToken)
 			_, err = c.checkIn(ctx, options)
-			if err == nil {
-				err = c.tryToConnect(ctx)
-			}
 		}
 		if err == nil {
 			// reset retry count when connection success
 			c.retry = 0
-		} else {
+
+			err = c.tryToConnect(ctx)
+		}
+		if err != nil {
 			if err == ErrGcmAuthorization {
 				c.creds = nil
 			}
-
-			// notify error
-			c.onError(err)
 
 			// retry
 			if c.retry >= math.MaxInt16 {
@@ -142,12 +134,15 @@ func (c *FcmClient) Connect(ctx context.Context) {
 			}
 			sleepDuration := internal.RetryBackoff(c.retry, c.minRetryBackoff, c.maxRetryBackoff)
 
+			// notify error
+			c.onError(err, sleepDuration)
+
 			time.Sleep(sleepDuration)
 		}
 	}
 }
 
-func (c *FcmClient) register(ctx context.Context) error {
+func (c *Client) register(ctx context.Context) error {
 	response, err := c.registerGCM(ctx)
 	if err != nil {
 		return err
@@ -161,19 +156,21 @@ func (c *FcmClient) register(ctx context.Context) error {
 	return nil
 }
 
-func (c *FcmClient) tryToConnect(ctx context.Context) error {
+func (c *Client) tryToConnect(ctx context.Context) error {
 	conn, err := internal.DialContextWithDialer(
 		ctx,
 		c.dialer,
 		"tcp",
 		internal.MtalkServer,
-		c.tlsConfig)
+		&tls.Config{
+			InsecureSkipVerify:       false,
+			PreferServerCipherSuites: true,
+			MinVersion:               tls.VersionTLS12,
+		})
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-
-	c.retry = 0
 
 	data, err := c.createLoginBuffer()
 	if err != nil {
@@ -186,7 +183,7 @@ func (c *FcmClient) tryToConnect(ctx context.Context) error {
 	return c.performRead(conn)
 }
 
-func (c *FcmClient) performRead(conn *tls.Conn) error {
+func (c *Client) performRead(conn *tls.Conn) error {
 	parser := internal.NewParser(conn)
 
 	// receive version
@@ -198,26 +195,30 @@ func (c *FcmClient) performRead(conn *tls.Conn) error {
 	for {
 		// receive tag
 		tagType, tag, err := parser.PerformReadTag()
+		if err == nil {
+			err = c.onDataMessage(tagType, tag)
+		}
 		if err != nil {
 			return err
 		}
-
-		c.onDataMessage(tagType, tag)
 	}
 }
 
-func (c *FcmClient) onDataMessage(tagType internal.TagType, tag interface{}) {
+func (c *Client) onDataMessage(tagType internal.TagType, tag interface{}) error {
 	if tagType == internal.TagDataMessageStanza {
 		persistentID, plaintext, err := decryptData(tag.(*pb.DataMessageStanza), c.creds.PrivateKey, c.creds.AuthSecret)
 		if err != nil {
-			c.onError(err)
-		} else if c.onMessage != nil {
+			return err
+		}
+		if c.onMessage != nil {
 			c.onMessage(*persistentID, plaintext)
 		}
+		c.receivedPersistentIds = append(c.receivedPersistentIds, *persistentID)
 	}
+	return nil
 }
 
-func (c *FcmClient) createLoginBuffer() ([]byte, error) {
+func (c *Client) createLoginBuffer() ([]byte, error) {
 	androidID := proto.String(strconv.FormatUint(c.creds.AndroidID, 10))
 	setting := []*pb.Setting{
 		{
@@ -252,7 +253,7 @@ func (c *FcmClient) createLoginBuffer() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func (c *FcmClient) subscribeFCM(ctx context.Context, registerResponse *gcmRegisterResponse) (*FcmCredentials, error) {
+func (c *Client) subscribeFCM(ctx context.Context, registerResponse *gcmRegisterResponse) (*FcmCredentials, error) {
 	keys, err := createKeys()
 	if err != nil {
 		return nil, err
@@ -269,7 +270,7 @@ func (c *FcmClient) subscribeFCM(ctx context.Context, registerResponse *gcmRegis
 	req, _ := http.NewRequest("POST", internal.FcmSubscribe, strings.NewReader(values.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	response, err := c.httpClient.Do(ctx, req)
+	response, err := c.httpClient.Do(req.WithContext(ctx))
 	if response == nil || err != nil {
 		return nil, errors.Wrap(err, "request FCM subscribe")
 	}

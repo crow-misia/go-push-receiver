@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"math/rand"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -26,15 +25,6 @@ func RetryBackoff(retry int, minBackoff, maxBackoff time.Duration) time.Duration
 		return 0
 	}
 	return time.Duration(rand.Int63n(int64(backoff)))
-}
-
-// HTTPClient is http.Client wrapper.
-type HTTPClient struct {
-	Client *http.Client
-}
-
-func (c *HTTPClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	return c.Client.Do(req.WithContext(ctx))
 }
 
 type timeoutError struct{}

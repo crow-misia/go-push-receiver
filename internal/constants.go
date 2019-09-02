@@ -29,14 +29,11 @@ const (
 
 	// Default values
 
-	// Connection timeout second
-	ConnectionTimeout = 30
+	// Dial timeout second
+	DialTimeout = 30
 
-	// Network read/write timeout second
-	NetworkTimeout = 30
-
-	// Keepalive minute
-	ConnectionKeepAlive = 5
+	// Network reads/writes timeout second
+	Timeout = 30
 
 	// Min backoff second
 	MinRetryBackoff = 5

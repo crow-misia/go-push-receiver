@@ -158,5 +158,5 @@ $RECYCLE.BIN/
 *.lnk
 
 # Files for testing.
-service_account.json
+serviceAccountKey.json
 credentials.json

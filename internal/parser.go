@@ -100,7 +100,8 @@ func (p *Parser) receiveTag() (TagType, error) {
 	n, err := p.conn.Read(buf)
 	if err != nil {
 		return 0, err
-	} else if n == 0 {
+	}
+	if n == 0 {
 		return 0, io.ErrClosedPipe
 	}
 	return TagType(buf[0]), nil

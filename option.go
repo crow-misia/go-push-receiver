@@ -1,28 +1,37 @@
 package pushreceiver
 
-// Option is an option for FCM client.
-type Option interface {
-	Apply(*FcmClient)
-}
+import (
+	"net"
+	"net/http"
+)
 
-type withCreds struct{ creds *FcmCredentials }
-
-func (c withCreds) Apply(client *FcmClient) {
-	client.creds = c.creds
-}
+// Option type
+type Option func(*Client)
 
 // WithCreds is credentials setter
 func WithCreds(creds *FcmCredentials) Option {
-	return withCreds{creds}
-}
-
-type withReceivedPersistentIds []string
-
-func (c withReceivedPersistentIds) Apply(client *FcmClient) {
-	client.receivedPersistentIds = c
+	return func(client *Client) {
+		client.creds = creds
+	}
 }
 
 // WithReceivedPersistentIds is received persistentId list setter
 func WithReceivedPersistentIds(ids []string) Option {
-	return withReceivedPersistentIds(ids)
+	return func(client *Client) {
+		client.receivedPersistentIds = ids
+	}
+}
+
+// WithHttpClient is http.Client setter
+func WithHttpClient(c *http.Client) Option {
+	return func(client *Client) {
+		client.httpClient = c
+	}
+}
+
+// WithDialer is net.Dialer setter
+func WithDialer(dialer *net.Dialer) Option {
+	return func(client *Client) {
+		client.dialer = dialer
+	}
 }

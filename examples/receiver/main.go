@@ -48,7 +48,7 @@ func realMain(ctx context.Context, senderId string, credsFilename string) {
 	// opts = append(opts, pr.WithReceivedPersistentIds([]string{"0:xxxxxxxxxxxxxxxxxxxxxxxxxx"}))
 
 	config := pr.Config{}
-	fcmClient := pr.NewFcmClient(senderId, &config, opts...)
+	fcmClient := pr.NewClient(senderId, &config, opts...)
 
 	fcmClient.SetOnUpdateCreds(func(creds *pr.FcmCredentials) {
 		data, err := json.Marshal(creds)
@@ -60,8 +60,8 @@ func realMain(ctx context.Context, senderId string, credsFilename string) {
 		}
 	})
 
-	fcmClient.SetOnError(func(err error) {
-		log.Println(err)
+	fcmClient.SetOnError(func(err error, duration time.Duration) {
+		log.Printf("error: %v, retry after %s", err, duration)
 	})
 	fcmClient.SetOnMessage(func(persistentId string, data []byte) {
 		log.Printf("%s : %s", persistentId, string(data))

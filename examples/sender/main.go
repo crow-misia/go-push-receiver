@@ -18,7 +18,7 @@ func main() {
 	)
 	flag.NewFlagSet("help", flag.ExitOnError)
 	flag.IntVar(&ttl, "ttl", 86400, "Message TTL. zero or negative is disable")
-	flag.StringVar(&credentialsFilename, "credentials", "service_account.json", "FCM's credentials filename")
+	flag.StringVar(&credentialsFilename, "credentials", "serviceAccountKey.json", "FCM's credentials filename")
 	flag.StringVar(&registrationToken, "token", "", "registration token (needed)")
 	flag.Parse()
 
@@ -33,7 +33,10 @@ func main() {
 func realMain(ctx context.Context, credentialsFilename string, ttl int, registrationToken string) {
 	opt := option.WithCredentialsFile(credentialsFilename)
 	config := firebase.Config{}
-	app, _ := firebase.NewApp(ctx, &config, opt)
+	app, err := firebase.NewApp(ctx, &config, opt)
+	if err != nil {
+		log.Fatalf("error new application: %v", err)
+	}
 	client, err := app.Messaging(ctx)
 	if err != nil {
 		log.Fatalf("error getting Messaging client: %v", err)
