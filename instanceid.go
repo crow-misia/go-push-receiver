@@ -1,10 +1,16 @@
+/*
+ * Copyright (c) 2019 Zenichi Amano
+ *
+ * This file is part of go-push-receiver, which is MIT licensed.
+ * See http://opensource.org/licenses/MIT
+ */
+
 package pushreceiver
 
 import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/crow-misia/go-push-receiver/internal"
 	pb "github.com/crow-misia/go-push-receiver/pb/checkin"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
@@ -27,13 +33,6 @@ type gcmRegisterResponse struct {
 	appID         string
 }
 
-func newCheckinOption(androidID uint64, securityToken uint64) *checkInOption {
-	return &checkInOption{
-		androidID:     androidID,
-		securityToken: securityToken,
-	}
-}
-
 func (c *Client) registerGCM(ctx context.Context) (*gcmRegisterResponse, error) {
 	checkInResp, err := c.checkIn(ctx, &checkInOption{})
 	if err != nil {
@@ -48,7 +47,7 @@ func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCh
 		Checkin: &pb.AndroidCheckinProto{
 			ChromeBuild: &pb.ChromeBuildProto{
 				Platform:      pb.ChromeBuildProto_PLATFORM_LINUX.Enum(),
-				ChromeVersion: proto.String(internal.ChromeVersion),
+				ChromeVersion: proto.String(chromeVersion),
 				Channel:       pb.ChromeBuildProto_CHANNEL_STABLE.Enum(),
 			},
 			Type:       pb.DeviceType_DEVICE_CHROME_BROWSER.Enum(),
@@ -66,26 +65,27 @@ func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCh
 		return nil, errors.Wrap(err, "marshal GCM checkin request")
 	}
 
-	req, _ := http.NewRequest("POST", internal.CheckinUrl, bytes.NewReader(message))
-	req.Header.Set("Content-Type", "application/x-protobuf")
-
-	response, err := c.httpClient.Do(req.WithContext(ctx))
-	if response == nil || err != nil {
+	res, err := c.post(ctx, checkinURL, bytes.NewReader(message), func(header *http.Header) {
+		header.Set("Content-Type", "application/x-protobuf")
+	})
+	if err != nil {
 		return nil, errors.Wrap(err, "request GCM checkin")
 	}
+	defer closeResponse(res)
 
 	// unauthorized error
-	if response.StatusCode == http.StatusUnauthorized {
+	if res.StatusCode == http.StatusUnauthorized {
 		return nil, ErrGcmAuthorization
 	}
-
-	data, err := ioutil.ReadAll(response.Body)
-	_ = response.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return nil, errors.Errorf("server error: %s", res.Status)
+	}
+	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read GCM checkin response")
 	}
 
-	responseProto := pb.AndroidCheckinResponse{}
+	var responseProto pb.AndroidCheckinResponse
 	err = proto.Unmarshal(data, &responseProto)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unmarshal GCM checkin response")
@@ -100,21 +100,18 @@ func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken
 	values.Set("app", "org.chromium.linux")
 	values.Set("X-subtype", appID)
 	values.Set("device", fmt.Sprint(androidID))
-	values.Set("sender", internal.FcmServerKey)
+	values.Set("sender", fcmServerKey)
 
-	httpClient := c.httpClient
-
-	req, _ := http.NewRequest("POST", internal.RegisterUrl, strings.NewReader(values.Encode()))
-	req.Header.Set("Authorization", fmt.Sprintf("AidLogin %d:%d", androidID, securityToken))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	response, err := httpClient.Do(req.WithContext(ctx))
+	res, err := c.post(ctx, registerURL, strings.NewReader(values.Encode()), func(header *http.Header) {
+		header.Set("Content-Type", "application/x-www-form-urlencoded")
+		header.Set("Authorization", fmt.Sprintf("AidLogin %d:%d", androidID, securityToken))
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "request GCM register")
 	}
+	defer closeResponse(res)
 
-	data, err := ioutil.ReadAll(response.Body)
-	_ = response.Body.Close()
+	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read GCM register response")
 	}

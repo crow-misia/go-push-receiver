@@ -1,33 +1,31 @@
+/*
+ * Copyright (c) 2019 Zenichi Amano
+ *
+ * This file is part of go-push-receiver, which is MIT licensed.
+ * See http://opensource.org/licenses/MIT
+ */
+
 package pushreceiver
 
 import (
 	"context"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"github.com/crow-misia/go-push-receiver/internal"
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
-	ece "github.com/crow-misia/http-ece"
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
-	"io/ioutil"
-	"math"
-	"math/big"
-	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 )
 
-var cryptoCurve = elliptic.P256()
+type fcmRegisterResponse struct {
+	Token   string `json:"token"`
+	PushSet string `json:"pushSet"`
+}
 
-// FcmCredentials is Credentials for FCM
-type FcmCredentials struct {
+// FCMCredentials is Credentials for FCM
+type FCMCredentials struct {
 	AppID         string `json:"appId"`
 	AndroidID     uint64 `json:"androidId"`
 	SecurityToken uint64 `json:"securityToken"`
@@ -37,107 +35,38 @@ type FcmCredentials struct {
 	AuthSecret    []byte `json:"authSecret"`
 }
 
-type fcmRegisterResponse struct {
-	Token   string `json:"token"`
-	PushSet string `json:"pushSet"`
-}
+// Subscribe subscribe to FCM.
+func (c *Client) Subscribe(ctx context.Context) {
+	defer close(c.Events)
 
-type fcmKeys struct {
-	privateKey []byte
-	publicKey  []byte
-	authSecret []byte
-}
-
-// Client is FCM Push receive client.
-type Client struct {
-	httpClient            *http.Client
-	senderID              string
-	creds                 *FcmCredentials
-	onUpdateCreds         func(*FcmCredentials)
-	onMessage             func(string, []byte)
-	onError               func(error, time.Duration)
-	dialer                *net.Dialer
-	minRetryBackoff       time.Duration
-	maxRetryBackoff       time.Duration
-	retry                 int
-	receivedPersistentIds []string
-}
-
-// NewClient creates FCM push receive client.
-func NewClient(senderID string, config *Config, opts ...Option) *Client {
-	config.init()
-
-	c := &Client{
-		senderID:              senderID,
-		minRetryBackoff:       config.MinRetryBackoff,
-		maxRetryBackoff:       config.MaxRetryBackoff,
-		retry:                 0,
-		receivedPersistentIds: make([]string, 0),
-		httpClient:            http.DefaultClient,
-		dialer: &net.Dialer{
-			Timeout:   config.Timeout,
-			KeepAlive: config.Timeout,
-		},
-	}
-
-	for _, opt := range opts {
-		opt(c)
-	}
-
-	return c
-}
-
-// SetOnUpdateCreds is FCM Credentials update callback setter.
-func (c *Client) SetOnUpdateCreds(callback func(*FcmCredentials)) {
-	c.onUpdateCreds = callback
-}
-
-// SetOnError is FCM error callback setter.
-func (c *Client) SetOnError(callback func(error, time.Duration)) {
-	c.onError = callback
-}
-
-// SetOnMessage is FCM data receive callback setter.
-func (c *Client) SetOnMessage(callback func(string, []byte)) {
-	c.onMessage = callback
-}
-
-// Connect connect to FCM.
-func (c *Client) Connect(ctx context.Context) {
-	for {
-		if ctx.Err() != nil {
-			return
-		}
+	for ctx.Err() == nil {
 		var err error
 		if c.creds == nil {
 			err = c.register(ctx)
 		} else {
-			options := newCheckinOption(c.creds.AndroidID, c.creds.SecurityToken)
-			_, err = c.checkIn(ctx, options)
+			_, err = c.checkIn(ctx, &checkInOption{c.creds.AndroidID, c.creds.SecurityToken})
 		}
 		if err == nil {
 			// reset retry count when connection success
-			c.retry = 0
+			c.backoff.reset()
 
 			err = c.tryToConnect(ctx)
 		}
 		if err != nil {
 			if err == ErrGcmAuthorization {
+				c.Events <- &UnauthorizedError{err}
 				c.creds = nil
 			}
 
 			// retry
-			if c.retry >= math.MaxInt16 {
-				c.retry = math.MaxInt16
-			} else {
-				c.retry++
+			sleepDuration := c.backoff.duration()
+			c.Events <- &RetryEvent{err, sleepDuration}
+			tick := time.After(sleepDuration)
+			select {
+			case <-tick:
+			case <-ctx.Done():
+				return
 			}
-			sleepDuration := internal.RetryBackoff(c.retry, c.minRetryBackoff, c.maxRetryBackoff)
-
-			// notify error
-			c.onError(err, sleepDuration)
-
-			time.Sleep(sleepDuration)
 		}
 	}
 }
@@ -152,225 +81,109 @@ func (c *Client) register(ctx context.Context) error {
 		return err
 	}
 	c.creds = creds
-	c.onUpdateCreds(creds)
+	c.Events <- &UpdateCredentialsEvent{creds}
 	return nil
 }
 
 func (c *Client) tryToConnect(ctx context.Context) error {
-	conn, err := internal.DialContextWithDialer(
-		ctx,
-		c.dialer,
-		"tcp",
-		internal.MtalkServer,
-		&tls.Config{
-			InsecureSkipVerify:       false,
-			PreferServerCipherSuites: true,
-			MinVersion:               tls.VersionTLS12,
-		})
+	conn, err := dialContextWithDialer(ctx, c.dialer, "tcp", mtalkServer, c.tlsConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "dial failed to FCM")
 	}
 	defer conn.Close()
 
-	data, err := c.createLoginBuffer()
+	mcs := newMCS(conn, c.log, c.creds, c.Events)
+	defer mcs.disconnect()
+
+	err = mcs.SendLoginPacket()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "send login packet failed")
 	}
-	_, err = conn.Write(data)
-	if err != nil {
-		return err
-	}
-	return c.performRead(conn)
+
+	// start heartbeat
+	go c.heartbeat.start(ctx, mcs)
+
+	return c.performRead(mcs)
 }
 
-func (c *Client) performRead(conn *tls.Conn) error {
-	parser := internal.NewParser(conn)
-
+func (c *Client) performRead(mcs *mcs) error {
 	// receive version
-	err := parser.ReceiveVersion()
+	err := mcs.ReceiveVersion()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "receive version failed")
 	}
 
 	for {
 		// receive tag
-		tagType, tag, err := parser.PerformReadTag()
-		if err == nil {
-			err = c.onDataMessage(tagType, tag)
-		}
+		data, err := mcs.PerformReadTag()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "receive tag failed")
+		}
+		if data == nil {
+			return ErrFcmNotEnoughData
+		}
+
+		err = c.onDataMessage(data)
+		if err != nil {
+			return errors.Wrap(err, "process data message failed")
 		}
 	}
 }
 
-func (c *Client) onDataMessage(tagType internal.TagType, tag interface{}) error {
-	if tagType == internal.TagDataMessageStanza {
-		persistentID, plaintext, err := decryptData(tag.(*pb.DataMessageStanza), c.creds.PrivateKey, c.creds.AuthSecret)
+func (c *Client) onDataMessage(tagData interface{}) error {
+	switch data := tagData.(type) {
+	case *pb.LoginResponse:
+		c.receivedPersistentID = nil
+		c.Events <- &ConnectedEvent{data.GetServerTimestamp()}
+	case *pb.DataMessageStanza:
+		// To avoid error loops, last streamID is notified even when an error occurs.
+		c.receivedPersistentID = append(c.receivedPersistentID, data.GetPersistentId())
+		event, err := decryptData(data, c.creds.PrivateKey, c.creds.AuthSecret)
 		if err != nil {
 			return err
 		}
-		if c.onMessage != nil {
-			c.onMessage(*persistentID, plaintext)
-		}
-		c.receivedPersistentIds = append(c.receivedPersistentIds, *persistentID)
+		c.Events <- event
 	}
 	return nil
 }
 
-func (c *Client) createLoginBuffer() ([]byte, error) {
-	androidID := proto.String(strconv.FormatUint(c.creds.AndroidID, 10))
-	setting := []*pb.Setting{
-		{
-			Name:  proto.String("new_vc"),
-			Value: proto.String("1"),
-		},
-	}
+func (c *Client) subscribeFCM(ctx context.Context, registerResponse *gcmRegisterResponse) (*FCMCredentials, error) {
+	credentials := &FCMCredentials{}
 
-	authToken := strconv.FormatUint(c.creds.SecurityToken, 10)
-
-	request := &pb.LoginRequest{
-		AccountId:            proto.Int64(1000000),
-		AuthService:          pb.LoginRequest_ANDROID_ID.Enum(),
-		AuthToken:            proto.String(authToken),
-		Id:                   proto.String(fmt.Sprintf("chrome-%s", internal.ChromeVersion)),
-		Domain:               proto.String(internal.McsDomain),
-		DeviceId:             proto.String(fmt.Sprintf("android-%s", strconv.FormatUint(c.creds.AndroidID, 16))),
-		NetworkType:          proto.Int32(1), // Wi-Fi
-		Resource:             androidID,
-		User:                 androidID,
-		UseRmq2:              proto.Bool(true),
-		LastRmqId:            proto.Int64(1), // Sending not enabled yet so this stays as 1.
-		Setting:              setting,
-		ReceivedPersistentId: c.receivedPersistentIds,
-	}
-
-	buffer := proto.NewBuffer([]byte{internal.FcmVersion, byte(internal.TagLoginRequest)})
-	err := buffer.EncodeMessage(request)
-	if err != nil {
-		return nil, errors.Wrap(err, "encode protocol buffer data")
-	}
-	return buffer.Bytes(), nil
-}
-
-func (c *Client) subscribeFCM(ctx context.Context, registerResponse *gcmRegisterResponse) (*FcmCredentials, error) {
-	keys, err := createKeys()
+	err := credentials.appendCryptoInfo()
 	if err != nil {
 		return nil, err
 	}
 
-	base64Encoding := base64.RawURLEncoding
-
 	values := url.Values{}
 	values.Set("authorized_entity", c.senderID)
-	values.Set("endpoint", internal.FcmEndpoint+registerResponse.token)
-	values.Set("encryption_key", base64Encoding.EncodeToString(keys.publicKey))
-	values.Set("encryption_auth", base64Encoding.EncodeToString(keys.authSecret))
+	values.Set("endpoint", fcmEndpoint+registerResponse.token)
+	values.Set("encryption_key", base64.RawURLEncoding.EncodeToString(credentials.PublicKey))
+	values.Set("encryption_auth", base64.RawURLEncoding.EncodeToString(credentials.AuthSecret))
 
-	req, _ := http.NewRequest("POST", internal.FcmSubscribe, strings.NewReader(values.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	response, err := c.httpClient.Do(req.WithContext(ctx))
-	if response == nil || err != nil {
+	res, err := c.post(ctx, fcmSubscribe, strings.NewReader(values.Encode()), func(header *http.Header) {
+		header.Set("Content-Type", "application/x-www-form-urlencoded")
+	})
+	if err != nil {
 		return nil, errors.Wrap(err, "request FCM subscribe")
 	}
+	defer closeResponse(res)
 
-	data, err := ioutil.ReadAll(response.Body)
-	_ = response.Body.Close()
-	if err != nil {
-		return nil, errors.Wrap(err, "read FCM subscribe response")
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return nil, errors.Errorf("server error: %s", res.Status)
 	}
-
-	fcmRegisterResponse := fcmRegisterResponse{}
-	err = json.Unmarshal(data, &fcmRegisterResponse)
+	var fcmRegisterResponse fcmRegisterResponse
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&fcmRegisterResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshal FCM subscribe response")
 	}
 
-	return &FcmCredentials{
-		AppID:         registerResponse.appID,
-		AndroidID:     registerResponse.androidID,
-		SecurityToken: registerResponse.securityToken,
-		Token:         fcmRegisterResponse.Token,
-		PrivateKey:    keys.privateKey,
-		PublicKey:     keys.publicKey,
-		AuthSecret:    keys.authSecret,
-	}, nil
-}
+	// set responses.
+	credentials.AppID = registerResponse.appID
+	credentials.AndroidID = registerResponse.androidID
+	credentials.SecurityToken = registerResponse.securityToken
+	credentials.Token = fcmRegisterResponse.Token
 
-func createKeys() (*fcmKeys, error) {
-	privateKey, publicKey, err := randomKey(cryptoCurve)
-	if err != nil {
-		return nil, errors.Wrap(err, "generate random key for FCM")
-	}
-
-	authSecret, err := randomSalt()
-	if err != nil {
-		return nil, errors.Wrap(err, "generate random salt for FCM")
-	}
-
-	return &fcmKeys{
-		privateKey,
-		publicKey,
-		authSecret,
-	}, nil
-}
-
-func decryptData(tag *pb.DataMessageStanza, privateKey []byte, authSecret []byte) (*string, []byte, error) {
-	cryptoKeyData := findByKey(tag.AppData, "crypto-key")
-	if cryptoKeyData == nil {
-		return nil, nil, errors.New("dh is not provided")
-	}
-
-	cryptoKey, err := base64.URLEncoding.DecodeString(cryptoKeyData.GetValue()[3:])
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "decode decrypt data")
-	}
-
-	saltData := findByKey(tag.AppData, "encryption")
-	if saltData == nil {
-		return nil, nil, errors.New("salt is not provided")
-	}
-	salt, err := base64.URLEncoding.DecodeString(saltData.GetValue()[5:])
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "decode salt")
-	}
-
-	plaintext, err := ece.Decrypt(tag.RawData,
-		ece.WithEncoding(ece.AESGCM),
-		ece.WithPrivate(privateKey),
-		ece.WithDh(cryptoKey),
-		ece.WithSalt(salt),
-		ece.WithAuthSecret(authSecret),
-	)
-	return tag.PersistentId, plaintext, errors.Wrap(err, "decrypt HTTP-ECE data")
-}
-
-func findByKey(data []*pb.AppData, key string) *pb.AppData {
-	for _, data := range data {
-		if *data.Key == key {
-			return data
-		}
-	}
-	return nil
-}
-
-func randomKey(curve elliptic.Curve) (private []byte, public []byte, err error) {
-	var x, y *big.Int
-	private, x, y, err = elliptic.GenerateKey(curve, rand.Reader)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	public = elliptic.Marshal(curve, x, y)
-	return
-}
-
-func randomSalt() ([]byte, error) {
-	salt := make([]byte, 16)
-	_, err := rand.Read(salt)
-	if err != nil {
-		return nil, err
-	}
-	return salt, nil
+	return credentials, nil
 }

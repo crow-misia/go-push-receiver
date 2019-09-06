@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"google.golang.org/api/option"
 	"log"
+	"time"
 )
 
 func main() {
@@ -54,7 +55,7 @@ func realMain(ctx context.Context, credentialsFilename string, ttl int, registra
 		},
 		Notification: &messaging.Notification{
 			Title: "Hello world",
-			Body:  "Test",
+			Body:  fmt.Sprintf("Test: %s", time.Now()),
 		},
 		Token: registrationToken,
 	}

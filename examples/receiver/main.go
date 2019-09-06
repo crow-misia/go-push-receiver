@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"flag"
 	pr "github.com/crow-misia/go-push-receiver"
-	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"time"
 )
 
@@ -31,46 +31,62 @@ func main() {
 }
 
 func realMain(ctx context.Context, senderId string, credsFilename string) {
-	opts := make([]pr.Option, 0)
+	var creds *pr.FCMCredentials
+
 	if isExist(credsFilename) {
-		creds := &pr.FcmCredentials{}
-		data, err := ioutil.ReadFile(credsFilename)
-		if err == nil {
-			err = json.Unmarshal(data, creds)
-		}
+		f, err := os.Open(credsFilename)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		opts = append(opts, pr.WithCreds(creds))
+		creds = &pr.FCMCredentials{}
+		decoder := json.NewDecoder(f)
+		err = decoder.Decode(creds)
+		_ = f.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
+
 	// set received persistent ids
-	// opts = append(opts, pr.WithReceivedPersistentIds([]string{"0:xxxxxxxxxxxxxxxxxxxxxxxxxx"}))
+	var persistentIDs []string
+	// persistentIDs = []string{"0:xxxxxxxxxxxxxxxxxxxxxxxxxx"}
 
-	config := pr.Config{}
-	fcmClient := pr.NewClient(senderId, &config, opts...)
+	fcmClient := pr.New(senderId,
+		pr.WithCreds(creds),
+		pr.WithHeartbeatPeriod(10*time.Second),
+		pr.WithLogger(log.New(os.Stderr, "push", log.Llongfile)),
+		pr.WithReceivedPersistentID(persistentIDs),
+	)
 
-	fcmClient.SetOnUpdateCreds(func(creds *pr.FcmCredentials) {
-		data, err := json.Marshal(creds)
-		if err == nil {
-			err = ioutil.WriteFile(credsFilename, data, 0600)
+	go fcmClient.Subscribe(ctx)
+
+	for event := range fcmClient.Events {
+		switch ev := event.(type) {
+		case *pr.UpdateCredentialsEvent:
+			log.Print(ev)
+			f, err := os.OpenFile(credsFilename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+			if err != nil {
+				log.Fatal(err)
+			}
+			encoder := json.NewEncoder(f)
+			err = encoder.Encode(ev.Credentials)
+			_ = f.Close()
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("Registration Token: %s", ev.Credentials.Token)
+		case *pr.UnauthorizedError:
+			log.Printf("error: %v", ev.ErrorObj)
+		case *pr.HeartbeatError:
+			log.Printf("error: %v", ev.ErrorObj)
+		case *pr.MessageEvent:
+			log.Printf("Received message: %s, %s", string(ev.Data), ev.PersistentID)
+		case *pr.RetryEvent:
+			log.Printf("retry : %v, %s", ev.ErrorObj, ev.RetryAfter)
+		default:
+			data, _ := json.Marshal(ev)
+			log.Printf("Event: %s (%s)", reflect.TypeOf(ev), data)
 		}
-		if err != nil {
-			log.Fatal(err)
-		}
-	})
-
-	fcmClient.SetOnError(func(err error, duration time.Duration) {
-		log.Printf("error: %v, retry after %s", err, duration)
-	})
-	fcmClient.SetOnMessage(func(persistentId string, data []byte) {
-		log.Printf("%s : %s", persistentId, string(data))
-	})
-
-	go fcmClient.Connect(ctx)
-
-	for {
-		time.Sleep(10 * time.Second)
 	}
 }
 
