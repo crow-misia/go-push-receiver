@@ -11,6 +11,7 @@ package pushreceiver
 import (
 	"context"
 	"crypto/tls"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"net"
@@ -95,12 +96,15 @@ func (c *Client) Debugf(format string, a interface{}) {
 }
 
 func (c *Client) post(ctx context.Context, url string, body io.Reader, headerSetter func(*http.Header)) (*http.Response, error) {
-	req, _ := http.NewRequest(http.MethodPost, url, body)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, errors.Wrap(err, "create post request error")
+	}
 	headerSetter(&req.Header)
 
-	if ctx != nil {
-		req = req.WithContext(ctx)
-	}
 	return c.httpClient.Do(req)
 }
 
