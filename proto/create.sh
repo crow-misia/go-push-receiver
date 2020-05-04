@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if [ ! -f bin/protoc ]; then
-  curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/protoc-3.9.1-linux-x86_64.zip
+  curl -L -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
   unzip protoc.zip
   rm protoc.zip
 fi

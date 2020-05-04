@@ -8,6 +8,7 @@
 syntax = "proto2";
 
 option optimize_for = LITE_RUNTIME;
+option go_package = ".;checkin_proto";
 package checkin_proto;
 
 // Build characteristics unique to the Chrome browser, and Chrome OS

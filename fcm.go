@@ -9,6 +9,7 @@ package pushreceiver
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
@@ -86,7 +87,7 @@ func (c *Client) register(ctx context.Context) error {
 }
 
 func (c *Client) tryToConnect(ctx context.Context) error {
-	conn, err := dialContextWithDialer(ctx, c.dialer, "tcp", mtalkServer, c.tlsConfig)
+	conn, err := tls.DialWithDialer(c.dialer, "tcp", mtalkServer, c.tlsConfig)
 	if err != nil {
 		return errors.Wrap(err, "dial failed to FCM")
 	}
