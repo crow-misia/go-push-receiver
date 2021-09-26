@@ -25,7 +25,7 @@ type mcs struct {
 	creds            *FCMCredentials
 	writeTimeout     time.Duration
 	incomingStreamID int32
-	heartbeatAck     chan interface{}
+	heartbeatAck     chan bool
 	disconnectDm     sync.Once
 	events           chan Event
 }
@@ -36,7 +36,7 @@ func newMCS(conn *tls.Conn, log ilogger, creds *FCMCredentials, events chan Even
 		log:              log,
 		creds:            creds,
 		incomingStreamID: 0,
-		heartbeatAck:     make(chan interface{}),
+		heartbeatAck:     make(chan bool),
 		events:           events,
 	}
 }
@@ -180,7 +180,7 @@ func (mcs *mcs) handleTag(response interface{}) {
 
 	switch response.(type) {
 	case *pb.HeartbeatAck:
-		mcs.heartbeatAck <- nil
+		mcs.heartbeatAck <- true
 	}
 }
 
