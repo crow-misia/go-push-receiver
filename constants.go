@@ -7,8 +7,6 @@
 
 package pushreceiver
 
-//go:generate stringer -output=constants_string.go -type=tagType --trimprefix=tag
-
 // tagType is FCM Request/Response Tag type
 type tagType byte
 
