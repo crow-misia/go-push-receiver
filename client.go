@@ -59,7 +59,7 @@ func New(senderID string, options ...ClientOption) *Client {
 	if c.tlsConfig == nil {
 		c.tlsConfig = &tls.Config{
 			InsecureSkipVerify: false,
-			MinVersion:         tls.VersionTLS12,
+			MinVersion:         tls.VersionTLS13,
 		}
 	}
 	if c.dialer == nil {
