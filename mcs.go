@@ -14,7 +14,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"io"
-	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -158,9 +157,9 @@ func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
 	var err error
 	var response interface{}
 
-	t, exists := tagMapping[tag]
+	responseGenerator, exists := tagMapping[tag]
 	if exists {
-		response = reflect.New(t).Interface()
+		response = responseGenerator()
 		err = proto.Unmarshal(buf, response.(proto.Message))
 
 		// output response
@@ -214,14 +213,16 @@ func (mcs *mcs) receiveSize() (int, error) {
 	}
 }
 
+type tagMessageGenerator func() interface{}
+
 // Tag mappings.
-var tagMapping = map[tagType]reflect.Type{
-	tagHeartbeatPing:     reflect.TypeOf(pb.HeartbeatPing{}),
-	tagHeartbeatAck:      reflect.TypeOf(pb.HeartbeatAck{}),
-	tagLoginRequest:      reflect.TypeOf(pb.LoginRequest{}),
-	tagLoginResponse:     reflect.TypeOf(pb.LoginResponse{}),
-	tagClose:             reflect.TypeOf(pb.Close{}),
-	tagIqStanza:          reflect.TypeOf(pb.IqStanza{}),
-	tagDataMessageStanza: reflect.TypeOf(pb.DataMessageStanza{}),
-	tagStreamErrorStanza: reflect.TypeOf(pb.StreamErrorStanza{}),
+var tagMapping = map[tagType]tagMessageGenerator{
+	tagHeartbeatPing:     func() interface{} { return &pb.HeartbeatPing{} },
+	tagHeartbeatAck:      func() interface{} { return &pb.HeartbeatAck{} },
+	tagLoginRequest:      func() interface{} { return &pb.LoginRequest{} },
+	tagLoginResponse:     func() interface{} { return &pb.LoginResponse{} },
+	tagClose:             func() interface{} { return &pb.Close{} },
+	tagIqStanza:          func() interface{} { return &pb.IqStanza{} },
+	tagDataMessageStanza: func() interface{} { return &pb.DataMessageStanza{} },
+	tagStreamErrorStanza: func() interface{} { return &pb.StreamErrorStanza{} },
 }
