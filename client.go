@@ -80,19 +80,9 @@ func New(senderID string, options ...ClientOption) *Client {
 		c.log = &discard{}
 	}
 
-	c.Debugf("Sender ID: %s", c.senderID)
+	c.log.Print("Sender ID: ", c.senderID)
 
 	return c
-}
-
-// Debugln print message.
-func (c *Client) Debugln(a interface{}) {
-	c.log.Println(a)
-}
-
-// Debugf print message.
-func (c *Client) Debugf(format string, a interface{}) {
-	c.log.Printf(format, a)
 }
 
 func (c *Client) post(ctx context.Context, url string, body io.Reader, headerSetter func(*http.Header)) (*http.Response, error) {

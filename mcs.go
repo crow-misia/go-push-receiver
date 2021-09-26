@@ -98,6 +98,8 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 		header = append(header, byte(tag))
 	}
 
+	mcs.log.Print("MCS request ", request)
+
 	buffer := proto.NewBuffer(header)
 	err := buffer.EncodeMessage(request)
 	if err != nil {
@@ -163,7 +165,7 @@ func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
 		err = proto.Unmarshal(buf, response.(proto.Message))
 
 		// output response
-		mcs.log.Printf("MCS response %v", response)
+		mcs.log.Print("MCS response ", response)
 
 		// handling tag
 		mcs.handleTag(response)
