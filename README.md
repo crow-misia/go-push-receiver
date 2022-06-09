@@ -9,6 +9,18 @@ A library to subscribe to GCM/FCM and receive notifications.
 
 This library was developed inspired by push-receiver (https://github.com/MatthieuLemoine/push-receiver/).
 
+## Build
+
+install protoc
+
+```shell
+$ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+$ protoc -I=proto --go_out=pb/mcs proto/mcs.proto
+$ protoc -I=proto --go_out=pb/checkin proto/checkin.proto
+$ protoc -I=proto --go_out=pb/checkin proto/android_checkin.proto
+$ go build
+```
+
 ## License
 
 MIT License

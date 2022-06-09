@@ -11,8 +11,9 @@ import (
 	"crypto/tls"
 	"fmt"
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"strconv"
 	"sync"
@@ -56,8 +57,6 @@ func (mcs *mcs) SendLoginPacket() error {
 		Value: proto.String("1"),
 	}
 
-	_ = mcs.getStreamID()
-
 	request := &pb.LoginRequest{
 		AccountId:         proto.Int64(1000000),
 		AuthService:       pb.LoginRequest_ANDROID_ID.Enum(),
@@ -78,16 +77,12 @@ func (mcs *mcs) SendLoginPacket() error {
 }
 
 func (mcs *mcs) SendHeartbeatPacketPing() error {
-	streamID := mcs.getStreamID()
+	streamID := mcs.incomingStreamID
 	request := &pb.HeartbeatPing{
 		LastStreamIdReceived: proto.Int32(streamID),
 	}
 
 	return mcs.sendRequest(tagHeartbeatPing, request, false)
-}
-
-func (mcs *mcs) getStreamID() int32 {
-	return mcs.incomingStreamID
 }
 
 func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion bool) error {
@@ -100,14 +95,14 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 
 	mcs.log.Print("MCS request ", request)
 
-	buffer := proto.NewBuffer(header)
-	err := buffer.EncodeMessage(request)
+	header = protowire.AppendVarint(header, uint64(proto.Size(request)))
+	data, err := proto.Marshal(request)
 	if err != nil {
 		return errors.Wrap(err, "encode protocol buffer data")
 	}
 
 	// output request
-	_, err = mcs.conn.Write(buffer.Bytes())
+	_, err = mcs.conn.Write(append(header, data...))
 	return err
 }
 
@@ -176,10 +171,9 @@ func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
 }
 
 func (mcs *mcs) handleTag(response interface{}) {
-	mcs.incomingStreamID++
-
 	switch response.(type) {
 	case *pb.HeartbeatAck:
+		mcs.incomingStreamID = *response.(*pb.HeartbeatAck).LastStreamIdReceived
 		mcs.heartbeatAck <- true
 	}
 }
@@ -208,7 +202,7 @@ func (mcs *mcs) receiveSize() (int, error) {
 			return 0, err
 		}
 		offset += length
-		n, n2 := proto.DecodeVarint(buf[0:offset])
+		n, n2 := protowire.ConsumeVarint(buf[0:offset])
 		if n2 > 0 {
 			return int(n), nil
 		}
