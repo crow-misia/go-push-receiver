@@ -6,7 +6,7 @@ require (
 	github.com/crow-misia/http-ece v0.0.0-20220609124132-c86f786520d9
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.28.1
 )
 
 require (
