@@ -13,7 +13,6 @@ import (
 	"crypto/tls"
 	"github.com/pkg/errors"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
@@ -100,6 +99,6 @@ func (c *Client) post(ctx context.Context, url string, body io.Reader, headerSet
 
 func closeResponse(res *http.Response) error {
 	defer res.Body.Close()
-	_, err := io.Copy(ioutil.Discard, res.Body)
+	_, err := io.Copy(io.Discard, res.Body)
 	return err
 }

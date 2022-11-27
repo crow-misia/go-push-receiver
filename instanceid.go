@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -80,7 +80,7 @@ func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCh
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return nil, errors.Errorf("server error: %s", res.Status)
 	}
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read GCM checkin response")
 	}
@@ -111,7 +111,7 @@ func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken
 	}
 	defer closeResponse(res)
 
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read GCM register response")
 	}
