@@ -16,22 +16,24 @@ func main() {
 		ttl                 int
 		credentialsFilename string
 		registrationToken   string
+		topic               string
 	)
 	flag.NewFlagSet("help", flag.ExitOnError)
 	flag.IntVar(&ttl, "ttl", 86400, "Message TTL. zero or negative is disable")
 	flag.StringVar(&credentialsFilename, "credentials", "serviceAccountKey.json", "FCM's credentials filename")
-	flag.StringVar(&registrationToken, "token", "", "registration token (needed)")
+	flag.StringVar(&registrationToken, "token", "", "registration token")
+	flag.StringVar(&topic, "topic", "", "topic name")
 	flag.Parse()
 
-	if len(registrationToken) == 0 {
+	if len(registrationToken) == 0 && len(topic) == 0 {
 		flag.PrintDefaults()
 		return
 	}
 
-	realMain(context.Background(), credentialsFilename, ttl, registrationToken)
+	realMain(context.Background(), credentialsFilename, ttl, registrationToken, topic)
 }
 
-func realMain(ctx context.Context, credentialsFilename string, ttl int, registrationToken string) {
+func realMain(ctx context.Context, credentialsFilename string, ttl int, registrationToken, topic string) {
 	opt := option.WithCredentialsFile(credentialsFilename)
 	config := firebase.Config{}
 	app, err := firebase.NewApp(ctx, &config, opt)
@@ -58,6 +60,7 @@ func realMain(ctx context.Context, credentialsFilename string, ttl int, registra
 			Body:  fmt.Sprintf("Test: %s", time.Now()),
 		},
 		Token: registrationToken,
+		Topic: topic,
 	}
 
 	// Send a message to the device corresponding to the provided
