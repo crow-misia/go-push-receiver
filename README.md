@@ -25,5 +25,5 @@ $ go build
 
 MIT License
 
-proto file is licensed by is The Chromium Authors. (BSD-style lisense)
+proto file is licensed by is The Chromium Authors. (BSD-style license)
 (copied it from https://chromium.googlesource.com/chromium/chromium/+/trunk/google_apis/gcm/protocol/)
