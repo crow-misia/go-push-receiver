@@ -11,7 +11,13 @@ This library was developed inspired by push-receiver (https://github.com/Matthie
 
 ## Build
 
-install protoc
+1. install protoc
+
+```shell
+brew install protobuf
+```
+
+2. build
 
 ```shell
 $ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
