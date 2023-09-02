@@ -104,7 +104,21 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 	// start heartbeat
 	go c.heartbeat.start(ctx, mcs)
 
-	return c.performRead(mcs)
+	select {
+	case err := <-c.asyncPerformRead(mcs):
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (c *Client) asyncPerformRead(mcs *mcs) <-chan error {
+	ch := make(chan error)
+	go func() {
+		defer close(ch)
+		ch <- c.performRead(mcs)
+	}()
+	return ch
 }
 
 func (c *Client) performRead(mcs *mcs) error {
