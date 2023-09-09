@@ -8,16 +8,15 @@
 package pushreceiver
 
 import (
-	"crypto/elliptic"
+	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 	ece "github.com/crow-misia/http-ece"
 	"github.com/pkg/errors"
-	"math/big"
 )
 
-var cryptoCurve = elliptic.P256()
+var cryptoCurve = ecdh.P256()
 
 // appendCryptoInfo appends key for crypto to Credentials.
 func (c *FCMCredentials) appendCryptoInfo() error {
@@ -72,15 +71,14 @@ func decryptData(data *pb.DataMessageStanza, privateKey []byte, authSecret []byt
 }
 
 // generateKey generates for public key crypto.
-func generateKey(curve elliptic.Curve) (private []byte, public []byte, err error) {
-	var x, y *big.Int
-	private, x, y, err = elliptic.GenerateKey(curve, rand.Reader)
-	if err != nil {
+func generateKey(curve ecdh.Curve) (private []byte, public []byte, err error) {
+	var privateKey *ecdh.PrivateKey
+	var publicKey *ecdh.PublicKey
+	if privateKey, err = curve.GenerateKey(rand.Reader); err != nil {
 		return nil, nil, err
 	}
-
-	public = elliptic.Marshal(curve, x, y)
-	return
+	publicKey = privateKey.PublicKey()
+	return privateKey.Bytes(), publicKey.Bytes(), nil
 }
 
 // generateSalt generates salt.
