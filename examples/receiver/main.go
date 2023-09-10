@@ -33,17 +33,19 @@ func main() {
 func realMain(ctx context.Context, senderId string, credsFilename string) {
 	var creds *pr.FCMCredentials
 
+	logger := log.New(os.Stderr, "app : ", log.Lshortfile|log.Ldate|log.Ltime)
+
 	if isExist(credsFilename) {
 		f, err := os.Open(credsFilename)
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 		creds = &pr.FCMCredentials{}
 		decoder := json.NewDecoder(f)
 		err = decoder.Decode(creds)
 		_ = f.Close()
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 	}
 
@@ -54,7 +56,7 @@ func realMain(ctx context.Context, senderId string, credsFilename string) {
 	fcmClient := pr.New(senderId,
 		pr.WithCreds(creds),
 		pr.WithHeartbeatPeriod(10*time.Second),
-		pr.WithLogger(log.New(os.Stderr, "push", log.Llongfile)),
+		pr.WithLogger(log.New(os.Stderr, "push: ", log.Lshortfile|log.Ldate|log.Ltime)),
 		pr.WithReceivedPersistentID(persistentIDs),
 	)
 
@@ -63,29 +65,29 @@ func realMain(ctx context.Context, senderId string, credsFilename string) {
 	for event := range fcmClient.Events {
 		switch ev := event.(type) {
 		case *pr.UpdateCredentialsEvent:
-			log.Print(ev)
+			logger.Print(ev)
 			f, err := os.OpenFile(credsFilename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 			if err != nil {
-				log.Fatal(err)
+				logger.Fatal(err)
 			}
 			encoder := json.NewEncoder(f)
 			err = encoder.Encode(ev.Credentials)
 			_ = f.Close()
 			if err != nil {
-				log.Fatal(err)
+				logger.Fatal(err)
 			}
-			log.Printf("Registration Token: %s", ev.Credentials.Token)
+			logger.Printf("Registration Token: %s", ev.Credentials.Token)
 		case *pr.UnauthorizedError:
-			log.Printf("error: %v", ev.ErrorObj)
+			logger.Printf("error: %v", ev.ErrorObj)
 		case *pr.HeartbeatError:
-			log.Printf("error: %v", ev.ErrorObj)
+			logger.Printf("error: %v", ev.ErrorObj)
 		case *pr.MessageEvent:
-			log.Printf("Received message: %s, %s", string(ev.Data), ev.PersistentID)
+			logger.Printf("Received message: %s, %s", string(ev.Data), ev.PersistentID)
 		case *pr.RetryEvent:
-			log.Printf("retry : %v, %s", ev.ErrorObj, ev.RetryAfter)
+			logger.Printf("retry : %v, %s", ev.ErrorObj, ev.RetryAfter)
 		default:
 			data, _ := json.Marshal(ev)
-			log.Printf("Event: %s (%s)", reflect.TypeOf(ev), data)
+			logger.Printf("Event: %s (%s)", reflect.TypeOf(ev), data)
 		}
 	}
 }
