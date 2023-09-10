@@ -33,7 +33,8 @@ func WithClientInterval(interval time.Duration) HeartbeatOption {
 // WithServerInterval is heartbeat server interval setter
 func WithServerInterval(interval time.Duration) HeartbeatOption {
 	return func(heartbeat *Heartbeat) {
-		heartbeat.serverInterval = interval
+		// minimum 1 minute
+		heartbeat.serverInterval = max(interval, 1*time.Minute)
 	}
 }
 
@@ -61,27 +62,51 @@ func newHeartbeat(options ...HeartbeatOption) *Heartbeat {
 
 func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
 	if h.deadmanTimeout <= 0 {
-		h.deadmanTimeout = durationDeadmanTimeout(h.clientInterval)
+		h.deadmanTimeout = durationDeadmanTimeout(max(h.clientInterval, h.serverInterval))
 	}
 
-	pingDeadman := time.NewTimer(h.deadmanTimeout)
-	defer pingDeadman.Stop()
+	var (
+		pingDeadman  *time.Timer
+		pingDeadmanC <-chan time.Time
+	)
+	if h.deadmanTimeout > 0 {
+		pingDeadman = time.NewTimer(h.deadmanTimeout)
+		pingDeadmanC = pingDeadman.C
+	}
+	defer func() {
+		if pingDeadman != nil {
+			pingDeadman.Stop()
+		}
+	}()
 
-	t := time.NewTicker(h.clientInterval)
-	defer t.Stop()
+	var (
+		pingTicker  *time.Ticker
+		pingTickerC <-chan time.Time
+	)
+	if h.clientInterval > 0 {
+		pingTicker = time.NewTicker(max(h.clientInterval, 1*time.Minute))
+		pingTickerC = pingTicker.C
+	}
+	defer func() {
+		if pingTicker != nil {
+			pingTicker.Stop()
+		}
+	}()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-mcs.heartbeatAck:
-			pingDeadman.Reset(h.deadmanTimeout)
-		case <-pingDeadman.C:
+			if pingDeadman != nil {
+				pingDeadman.Reset(h.deadmanTimeout)
+			}
+		case <-pingDeadmanC:
 			// force disconnect
 			mcs.log.Print("force disconnect by heartbeat")
 			mcs.disconnect()
 			return
-		case <-t.C:
+		case <-pingTickerC:
 			// send heartbeat to FCM
 			err := mcs.SendHeartbeatPingPacket()
 			if err != nil {
