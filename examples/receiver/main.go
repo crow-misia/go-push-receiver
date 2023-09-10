@@ -55,7 +55,11 @@ func realMain(ctx context.Context, senderId string, credsFilename string) {
 
 	fcmClient := pr.New(senderId,
 		pr.WithCreds(creds),
-		pr.WithHeartbeatPeriod(10*time.Second),
+		pr.WithHeartbeat(
+			pr.WithServerInterval(30*time.Second),
+			pr.WithClientInterval(1*time.Minute),
+			pr.WithAdaptive(true),
+		),
 		pr.WithLogger(log.New(os.Stderr, "push: ", log.Lshortfile|log.Ldate|log.Ltime)),
 		pr.WithReceivedPersistentID(persistentIDs),
 	)

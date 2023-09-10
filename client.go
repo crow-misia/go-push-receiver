@@ -53,7 +53,9 @@ func New(senderID string, options ...ClientOption) *Client {
 		c.backoff = NewBackoff(defaultBackoffBase*time.Second, defaultBackoffMax*time.Second)
 	}
 	if c.heartbeat == nil {
-		c.heartbeat = newHeartbeat(defaultHeartbeatPeriod * time.Minute)
+		c.heartbeat = newHeartbeat(
+			WithClientInterval(defaultHeartbeatPeriod * time.Minute),
+		)
 	}
 	if c.tlsConfig == nil {
 		c.tlsConfig = &tls.Config{

@@ -27,17 +27,19 @@ type mcs struct {
 	writeTimeout     time.Duration
 	incomingStreamID int32
 	heartbeatAck     chan bool
+	heartbeat        *Heartbeat
 	disconnectDm     sync.Once
 	events           chan Event
 }
 
-func newMCS(conn *tls.Conn, log ilogger, creds *FCMCredentials, events chan Event) *mcs {
+func newMCS(conn *tls.Conn, log ilogger, creds *FCMCredentials, heartbeat *Heartbeat, events chan Event) *mcs {
 	return &mcs{
 		conn:             conn,
 		log:              log,
 		creds:            creds,
 		incomingStreamID: 0,
 		heartbeatAck:     make(chan bool),
+		heartbeat:        heartbeat,
 		events:           events,
 	}
 }
@@ -52,9 +54,18 @@ func (mcs *mcs) disconnect() {
 
 func (mcs *mcs) SendLoginPacket() error {
 	androidID := proto.String(strconv.FormatUint(mcs.creds.AndroidID, 10))
-	setting := &pb.Setting{
-		Name:  proto.String("new_vc"),
-		Value: proto.String("1"),
+
+	setting := []*pb.Setting{
+		{
+			Name:  proto.String("new_vc"),
+			Value: proto.String("1"),
+		},
+	}
+	if mcs.heartbeat.serverInterval > 0 {
+		setting = append(setting, &pb.Setting{
+			Name:  proto.String("hbping"),
+			Value: proto.String(strconv.FormatInt(mcs.heartbeat.serverInterval.Milliseconds(), 10)),
+		})
 	}
 
 	request := &pb.LoginRequest{
@@ -69,20 +80,29 @@ func (mcs *mcs) SendLoginPacket() error {
 		User:              androidID,
 		UseRmq2:           proto.Bool(true),
 		LastRmqId:         proto.Int64(1), // Sending not enabled yet so this stays as 1.
-		Setting:           []*pb.Setting{setting},
-		AdaptiveHeartbeat: proto.Bool(false),
+		Setting:           setting,
+		AdaptiveHeartbeat: proto.Bool(mcs.heartbeat.adaptive),
 	}
 
 	return mcs.sendRequest(tagLoginRequest, request, true)
 }
 
-func (mcs *mcs) SendHeartbeatPacketPing() error {
+func (mcs *mcs) SendHeartbeatPingPacket() error {
 	streamID := mcs.incomingStreamID
 	request := &pb.HeartbeatPing{
 		LastStreamIdReceived: proto.Int32(streamID),
 	}
 
 	return mcs.sendRequest(tagHeartbeatPing, request, false)
+}
+
+func (mcs *mcs) SendHeartbeatAckPacket() error {
+	streamID := mcs.incomingStreamID
+	request := &pb.HeartbeatAck{
+		LastStreamIdReceived: proto.Int32(streamID),
+	}
+
+	return mcs.sendRequest(tagHeartbeatAck, request, false)
 }
 
 func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion bool) error {
@@ -93,7 +113,7 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 		header = append(header, byte(tag))
 	}
 
-	mcs.log.Print("MCS request ", request)
+	mcs.log.Print("MCS request ", tag, request)
 
 	header = protowire.AppendVarint(header, uint64(proto.Size(request)))
 	data, err := proto.Marshal(request)
@@ -151,30 +171,48 @@ func (mcs *mcs) PerformReadTag() (interface{}, error) {
 }
 
 func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
-	var err error
-	var response interface{}
+	var receive interface{}
 
-	responseGenerator, exists := tagMapping[tag]
+	receiveGenerator, exists := tagMapping[tag]
 	if exists {
-		response = responseGenerator()
-		err = proto.Unmarshal(buf, response.(proto.Message))
+		receive = receiveGenerator()
+		if err := proto.Unmarshal(buf, receive.(proto.Message)); err != nil {
+			return receive, errors.Wrapf(err, "unmarshal tag(%x) data", tag)
+		}
 
-		// output response
-		mcs.log.Print("MCS response ", response)
+		// output receive
+		mcs.log.Print("MCS receive ", tag, receive)
 
 		// handling tag
-		mcs.handleTag(response)
+		if err := mcs.handleTag(receive); err != nil {
+			return receive, errors.Wrap(err, "handling failed.")
+		}
 
-		return response, errors.Wrapf(err, "unmarshal tag(%x) data", tag)
+		return receive, nil
 	}
 	return nil, errors.Errorf("unknown tag: %x", tag)
 }
 
-func (mcs *mcs) handleTag(response interface{}) {
-	switch response.(type) {
-	case *pb.HeartbeatAck:
-		mcs.incomingStreamID = *response.(*pb.HeartbeatAck).LastStreamIdReceived
+func (mcs *mcs) handleTag(receive interface{}) error {
+	switch receive.(type) {
+	case *pb.HeartbeatPing:
+		mcs.updateIncomingStreamID((*receive.(*pb.HeartbeatPing)).GetLastStreamIdReceived())
 		mcs.heartbeatAck <- true
+		return mcs.SendHeartbeatAckPacket()
+	case *pb.HeartbeatAck:
+		mcs.updateIncomingStreamID((*receive.(*pb.HeartbeatAck)).GetLastStreamIdReceived())
+		mcs.heartbeatAck <- true
+	case *pb.LoginResponse:
+		mcs.updateIncomingStreamID((*receive.(*pb.LoginResponse)).GetLastStreamIdReceived())
+	case *pb.IqStanza:
+		mcs.updateIncomingStreamID((*receive.(*pb.IqStanza)).GetLastStreamIdReceived())
+	}
+	return nil
+}
+
+func (mcs *mcs) updateIncomingStreamID(lastStreamIdReceived int32) {
+	if lastStreamIdReceived > 0 {
+		mcs.incomingStreamID = lastStreamIdReceived
 	}
 }
 

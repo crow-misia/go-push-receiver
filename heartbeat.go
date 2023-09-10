@@ -14,20 +14,60 @@ import (
 
 // Heartbeat sends signal for connection keep alive.
 type Heartbeat struct {
-	period time.Duration
+	clientInterval time.Duration
+	serverInterval time.Duration
+	deadmanTimeout time.Duration
+	adaptive       bool
 }
 
-func newHeartbeat(period time.Duration) *Heartbeat {
-	return &Heartbeat{
-		period: period,
+// HeartbeatOption type
+type HeartbeatOption func(*Heartbeat)
+
+// WithClientInterval is heartbeat client interval setter
+func WithClientInterval(interval time.Duration) HeartbeatOption {
+	return func(heartbeat *Heartbeat) {
+		heartbeat.clientInterval = interval
 	}
 }
 
+// WithServerInterval is heartbeat server interval setter
+func WithServerInterval(interval time.Duration) HeartbeatOption {
+	return func(heartbeat *Heartbeat) {
+		heartbeat.serverInterval = interval
+	}
+}
+
+// WithDeadmanTimeout is heartbeat deadman timeout setter
+func WithDeadmanTimeout(timeout time.Duration) HeartbeatOption {
+	return func(heartbeat *Heartbeat) {
+		heartbeat.deadmanTimeout = timeout
+	}
+}
+
+// WithAdaptive is heartbeat adaptive setter
+func WithAdaptive(enabled bool) HeartbeatOption {
+	return func(heartbeat *Heartbeat) {
+		heartbeat.adaptive = enabled
+	}
+}
+
+func newHeartbeat(options ...HeartbeatOption) *Heartbeat {
+	h := &Heartbeat{}
+	for _, option := range options {
+		option(h)
+	}
+	return h
+}
+
 func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
-	pingDeadman := time.NewTimer(durationDeadman(h.period))
+	if h.deadmanTimeout <= 0 {
+		h.deadmanTimeout = durationDeadmanTimeout(h.clientInterval)
+	}
+
+	pingDeadman := time.NewTimer(h.deadmanTimeout)
 	defer pingDeadman.Stop()
 
-	t := time.NewTicker(h.period)
+	t := time.NewTicker(h.clientInterval)
 	defer t.Stop()
 
 	for {
@@ -35,14 +75,15 @@ func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
 		case <-ctx.Done():
 			return
 		case <-mcs.heartbeatAck:
-			pingDeadman.Reset(durationDeadman(h.period))
+			pingDeadman.Reset(h.deadmanTimeout)
 		case <-pingDeadman.C:
 			// force disconnect
+			mcs.log.Print("force disconnect by heartbeat")
 			mcs.disconnect()
 			return
 		case <-t.C:
 			// send heartbeat to FCM
-			err := mcs.SendHeartbeatPacketPing()
+			err := mcs.SendHeartbeatPingPacket()
 			if err != nil {
 				return
 			}
@@ -50,6 +91,6 @@ func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
 	}
 }
 
-func durationDeadman(period time.Duration) time.Duration {
-	return period * 4
+func durationDeadmanTimeout(interval time.Duration) time.Duration {
+	return interval * 4
 }

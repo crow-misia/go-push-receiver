@@ -93,7 +93,7 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 	}
 	defer conn.Close()
 
-	mcs := newMCS(conn, c.log, c.creds, c.Events)
+	mcs := newMCS(conn, c.log, c.creds, c.heartbeat, c.Events)
 	defer mcs.disconnect()
 
 	err = mcs.SendLoginPacket()

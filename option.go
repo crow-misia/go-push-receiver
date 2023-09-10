@@ -10,7 +10,6 @@ package pushreceiver
 import (
 	"crypto/tls"
 	"net"
-	"time"
 )
 
 // ClientOption type
@@ -58,10 +57,10 @@ func WithBackoff(b *Backoff) ClientOption {
 	}
 }
 
-// WithHeartbeatPeriod is Heartbeat period setter
-func WithHeartbeatPeriod(period time.Duration) ClientOption {
+// WithHeartbeat is Heartbeat setter
+func WithHeartbeat(options ...HeartbeatOption) ClientOption {
 	return func(client *Client) {
-		client.heartbeat = newHeartbeat(period)
+		client.heartbeat = newHeartbeat(options...)
 	}
 }
 
