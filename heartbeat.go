@@ -34,7 +34,11 @@ func WithClientInterval(interval time.Duration) HeartbeatOption {
 func WithServerInterval(interval time.Duration) HeartbeatOption {
 	return func(heartbeat *Heartbeat) {
 		// minimum 1 minute
-		heartbeat.serverInterval = max(interval, 1*time.Minute)
+		if interval > 1*time.Minute {
+			heartbeat.serverInterval = interval
+		} else {
+			heartbeat.serverInterval = 1 * time.Minute
+		}
 	}
 }
 
@@ -62,7 +66,11 @@ func newHeartbeat(options ...HeartbeatOption) *Heartbeat {
 
 func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
 	if h.deadmanTimeout <= 0 {
-		h.deadmanTimeout = durationDeadmanTimeout(max(h.clientInterval, h.serverInterval))
+		if h.clientInterval < h.serverInterval {
+			h.deadmanTimeout = durationDeadmanTimeout(h.serverInterval)
+		} else {
+			h.deadmanTimeout = durationDeadmanTimeout(h.clientInterval)
+		}
 	}
 
 	var (
@@ -84,7 +92,7 @@ func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
 		pingTickerC <-chan time.Time
 	)
 	if h.clientInterval > 0 {
-		pingTicker = time.NewTicker(max(h.clientInterval, 1*time.Minute))
+		pingTicker = time.NewTicker(h.clientInterval)
 		pingTickerC = pingTicker.C
 	}
 	defer func() {
