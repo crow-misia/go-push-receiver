@@ -70,3 +70,10 @@ func WithDialer(dialer *net.Dialer) ClientOption {
 		client.dialer = dialer
 	}
 }
+
+// WithRetry is Backoff setter
+func WithRetry(retry bool) ClientOption {
+	return func(client *Client) {
+		client.retryDisabled = !retry
+	}
+}

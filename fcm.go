@@ -12,12 +12,13 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
-	"github.com/pkg/errors"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
+	"github.com/pkg/errors"
 )
 
 type fcmRegisterResponse struct {
@@ -58,7 +59,9 @@ func (c *Client) Subscribe(ctx context.Context) {
 				c.Events <- &UnauthorizedError{err}
 				c.creds = nil
 			}
-
+			if c.retryDisabled {
+				return
+			}
 			// retry
 			sleepDuration := c.backoff.duration()
 			c.Events <- &RetryEvent{err, sleepDuration}
