@@ -71,7 +71,7 @@ func WithDialer(dialer *net.Dialer) ClientOption {
 	}
 }
 
-// WithRetry is Backoff setter
+// WithRetry configures whether to retry when an error occurs.
 func WithRetry(retry bool) ClientOption {
 	return func(client *Client) {
 		client.retryDisabled = !retry
