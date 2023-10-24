@@ -55,7 +55,7 @@ func (c *Client) Subscribe(ctx context.Context) {
 			err = c.tryToConnect(ctx)
 		}
 		if err != nil {
-			if err == ErrGcmAuthorization {
+			if errors.Is(err, ErrGcmAuthorization) {
 				c.Events <- &UnauthorizedError{err}
 				c.creds = nil
 			}
