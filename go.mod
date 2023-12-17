@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/crow-misia/http-ece v0.0.0-20231114124310-4d4967551ef8
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.5.0
 	github.com/pkg/errors v0.9.1
 	google.golang.org/protobuf v1.31.0
 )
