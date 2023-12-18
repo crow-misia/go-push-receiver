@@ -9,4 +9,4 @@ require (
 	google.golang.org/protobuf v1.31.0
 )
 
-require golang.org/x/crypto v0.15.0 // indirect
+require golang.org/x/crypto v0.17.0 // indirect
