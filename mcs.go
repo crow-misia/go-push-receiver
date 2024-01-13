@@ -52,7 +52,7 @@ func (mcs *mcs) disconnect() {
 	})
 }
 
-func (mcs *mcs) SendLoginPacket() error {
+func (mcs *mcs) SendLoginPacket(receivedPersistentId []string) error {
 	androidID := proto.String(strconv.FormatUint(mcs.creds.AndroidID, 10))
 
 	setting := []*pb.Setting{
@@ -69,19 +69,20 @@ func (mcs *mcs) SendLoginPacket() error {
 	}
 
 	request := &pb.LoginRequest{
-		AccountId:         proto.Int64(1000000),
-		AuthService:       pb.LoginRequest_ANDROID_ID.Enum(),
-		AuthToken:         proto.String(strconv.FormatUint(mcs.creds.SecurityToken, 10)),
-		Id:                proto.String(fmt.Sprintf("chrome-%s", chromeVersion)),
-		Domain:            proto.String(mcsDomain),
-		DeviceId:          proto.String(fmt.Sprintf("android-%s", strconv.FormatUint(mcs.creds.AndroidID, 16))),
-		NetworkType:       proto.Int32(1), // Wi-Fi
-		Resource:          androidID,
-		User:              androidID,
-		UseRmq2:           proto.Bool(true),
-		LastRmqId:         proto.Int64(1), // Sending not enabled yet so this stays as 1.
-		Setting:           setting,
-		AdaptiveHeartbeat: proto.Bool(mcs.heartbeat.adaptive),
+		AccountId:            proto.Int64(1000000),
+		AuthService:          pb.LoginRequest_ANDROID_ID.Enum(),
+		AuthToken:            proto.String(strconv.FormatUint(mcs.creds.SecurityToken, 10)),
+		Id:                   proto.String(fmt.Sprintf("chrome-%s", chromeVersion)),
+		Domain:               proto.String(mcsDomain),
+		DeviceId:             proto.String(fmt.Sprintf("android-%s", strconv.FormatUint(mcs.creds.AndroidID, 16))),
+		NetworkType:          proto.Int32(1), // Wi-Fi
+		Resource:             androidID,
+		User:                 androidID,
+		UseRmq2:              proto.Bool(true),
+		LastRmqId:            proto.Int64(1), // Sending not enabled yet so this stays as 1.
+		Setting:              setting,
+		AdaptiveHeartbeat:    proto.Bool(mcs.heartbeat.adaptive),
+		ReceivedPersistentId: receivedPersistentId,
 	}
 
 	return mcs.sendRequest(tagLoginRequest, request, true)

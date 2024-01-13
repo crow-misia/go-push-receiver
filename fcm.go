@@ -99,7 +99,7 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 	mcs := newMCS(conn, c.log, c.creds, c.heartbeat, c.Events)
 	defer mcs.disconnect()
 
-	err = mcs.SendLoginPacket()
+	err = mcs.SendLoginPacket(c.receivedPersistentID)
 	if err != nil {
 		return errors.Wrap(err, "send login packet failed")
 	}
