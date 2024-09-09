@@ -21,13 +21,23 @@ import (
 	"github.com/pkg/errors"
 )
 
+type fcmInstallResponse struct {
+	Name         string `json:"name"`
+	Fid          string `json:"fid"`
+	RefreshToken string `json:"refreshToken"`
+	AuthToken    struct {
+		Token     string `json:"token"`
+		ExpiresIn string `json:"expiresIn"`
+	} `json:"authToken"`
+}
+
 type fcmRegisterResponse struct {
 	Token   string `json:"token"`
 	PushSet string `json:"pushSet"`
 }
 
 // FCMCredentials is Credentials for FCM
-type FCMCredentials struct {
+type FCMCredentials struct { // TODO: Determine if FCMCredentials needs vapidKey
 	AppID         string `json:"appId"`
 	AndroidID     uint64 `json:"androidId"`
 	SecurityToken uint64 `json:"securityToken"`
@@ -80,7 +90,11 @@ func (c *Client) register(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	creds, err := c.subscribeFCM(ctx, response)
+	install, err := c.installFCM(ctx)
+	if err != nil {
+		return err
+	}
+	creds, err := c.registerFCM(ctx, response, install)
 	if err != nil {
 		return err
 	}
@@ -165,7 +179,69 @@ func (c *Client) onDataMessage(tagData interface{}) error {
 	return nil
 }
 
-func (c *Client) subscribeFCM(ctx context.Context, registerResponse *gcmRegisterResponse) (*FCMCredentials, error) {
+func (c *Client) installFCM(ctx context.Context) (*fcmInstallResponse, error) {
+	fid, err := generateFid()
+	if err != nil {
+		return nil, errors.Wrap(err, "error generating FID")
+	}
+
+	body := map[string]string{
+		"appId":       c.appId,
+		"authVersion": "FIS_v2",
+		"fid":         fid,
+		"sdkVersion":  "w:0.6.6",
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal FCM install request")
+	}
+
+	// TODO: Implement proper heartbeat
+	clientHeartbeat := map[string]interface{}{
+		"heartbeats": []interface{}{},
+		"version":    2,
+	}
+
+	clientHeartbeatBytes, err := json.Marshal(clientHeartbeat)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal FCM client heartbeat request")
+	}
+
+	u, err := url.Parse(fbInstallation)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse FCM install URL error")
+	}
+	u.Path, err = url.JoinPath(u.Path, "projects", c.projectId, "installations")
+	if err != nil {
+		return nil, errors.Wrap(err, "join FCM install URL error")
+	}
+
+	res, err := c.post(ctx, u.String(), strings.NewReader(string(bodyBytes)), func(header *http.Header) {
+		header.Set("Content-Type", "application/json")
+		header.Set("x-firebase-client", base64.StdEncoding.EncodeToString(clientHeartbeatBytes))
+		header.Set("x-goog-api-key", c.apiKey)
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "request FCM install")
+	}
+	defer closeResponse(res)
+
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return nil, errors.Errorf("server error: %s", res.Status)
+	}
+
+	var fcmInstallResponse fcmInstallResponse
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&fcmInstallResponse)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshal FCM install response")
+	}
+
+	return &fcmInstallResponse, nil
+}
+
+func (c *Client) registerFCM(ctx context.Context, registerResponse *gcmRegisterResponse, installResponse *fcmInstallResponse) (*FCMCredentials, error) {
 	credentials := &FCMCredentials{}
 
 	err := credentials.appendCryptoInfo()
@@ -173,23 +249,40 @@ func (c *Client) subscribeFCM(ctx context.Context, registerResponse *gcmRegister
 		return nil, err
 	}
 
-	values := url.Values{}
-	values.Set("authorized_entity", c.senderID)
-	values.Set("endpoint", fcmEndpoint+registerResponse.token)
-	values.Set("encryption_key", base64.RawURLEncoding.EncodeToString(credentials.PublicKey))
-	values.Set("encryption_auth", base64.RawURLEncoding.EncodeToString(credentials.AuthSecret))
+	body := map[string]interface{}{
+		"web": map[string]string{
+			"applicationPubKey": vapidKey,
+			"endpoint":          fcmEndpoint + registerResponse.token,
+			"p256dh":            base64.RawURLEncoding.EncodeToString(credentials.PublicKey),
+			"auth":              base64.RawURLEncoding.EncodeToString(credentials.AuthSecret),
+		},
+	}
 
-	res, err := c.post(ctx, fcmSubscribe, strings.NewReader(values.Encode()), func(header *http.Header) {
-		header.Set("Content-Type", "application/x-www-form-urlencoded")
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal FCM register request")
+	}
+
+	u, err := url.Parse(fbRegistration)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse FCM register URL error")
+	}
+	u.Path, err = url.JoinPath(u.Path, "projects", c.projectId, "registrations")
+
+	res, err := c.post(ctx, u.String(), strings.NewReader(string(bodyBytes)), func(header *http.Header) {
+		header.Set("Content-Type", "application/json")
+		header.Set("x-goog-api-key", c.apiKey)
+		header.Set("x-goog-firebase-installations-auth", installResponse.AuthToken.Token)
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "request FCM subscribe")
+		return nil, errors.Wrap(err, "request FCM register")
 	}
 	defer closeResponse(res)
 
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return nil, errors.Errorf("server error: %s", res.Status)
 	}
+
 	var fcmRegisterResponse fcmRegisterResponse
 	decoder := json.NewDecoder(res.Body)
 	err = decoder.Decode(&fcmRegisterResponse)
