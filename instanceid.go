@@ -12,7 +12,6 @@ import (
 	"context"
 	"fmt"
 	pb "github.com/crow-misia/go-push-receiver/pb/checkin"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 	"io"
@@ -94,11 +93,9 @@ func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCh
 }
 
 func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken uint64) (*gcmRegisterResponse, error) {
-	appID := fmt.Sprintf("wp:receiver.push.com#%s", uuid.New())
-
 	values := url.Values{}
 	values.Set("app", "org.chromium.linux")
-	values.Set("X-subtype", appID)
+	values.Set("X-subtype", c.appId)
 	values.Set("device", fmt.Sprint(androidID))
 	values.Set("sender", fcmServerKey)
 
@@ -126,6 +123,6 @@ func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken
 		token:         token,
 		androidID:     androidID,
 		securityToken: securityToken,
-		appID:         appID,
+		appID:         c.appId,
 	}, nil
 }

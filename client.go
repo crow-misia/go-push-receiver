@@ -10,7 +10,9 @@ package pushreceiver
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
 	"io"
 	"net"
 	"net/http"
@@ -26,7 +28,9 @@ type httpClient interface {
 
 // Client is FCM Push receive client.
 type Client struct {
-	senderID             string
+	apiKey               string
+	appId                string
+	projectId            string
 	log                  ilogger
 	httpClient           httpClient
 	tlsConfig            *tls.Config
@@ -40,10 +44,12 @@ type Client struct {
 }
 
 // New returns a new FCM push receive client instance.
-func New(senderID string, options ...ClientOption) *Client {
+func New(apiKey string, appId string, projectId string, options ...ClientOption) *Client {
 	c := &Client{
-		senderID: senderID,
-		Events:   make(chan Event, 50),
+		apiKey:    apiKey,
+		appId:     appId,
+		projectId: projectId,
+		Events:    make(chan Event, 50),
 	}
 
 	for _, option := range options {
@@ -83,7 +89,9 @@ func New(senderID string, options ...ClientOption) *Client {
 		c.log = &discard{}
 	}
 
-	c.log.Print("Sender ID: ", c.senderID)
+	c.log.Print("API Key: ", c.apiKey) // TODO: Not sure if this is good practice
+	c.log.Print("App ID: ", c.appId)
+	c.log.Print("Project ID: ", c.projectId)
 
 	return c
 }
@@ -105,4 +113,17 @@ func closeResponse(res *http.Response) error {
 	defer res.Body.Close()
 	_, err := io.Copy(io.Discard, res.Body)
 	return err
+}
+
+func generateFid() (string, error) {
+	byteArr := make([]byte, 17)
+	_, err := rand.Read(byteArr)
+	if err != nil {
+		return "", err
+	}
+
+	// Replace the first four bits with 0111 for the constant FID header
+	byteArr[0] = 0b01110000 + (byteArr[0] % 0b00010000)
+
+	return base64.RawURLEncoding.EncodeToString(byteArr)[:22], nil
 }
