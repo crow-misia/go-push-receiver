@@ -16,12 +16,14 @@ const (
 	checkinURL    = "https://android.clients.google.com/checkin"
 	chromeVersion = "63.0.3234.0"
 	fcmServerKey  = "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4"
+	vapidKey      = "" // TODO: May need a vapid key for sender
 
-	fcmSubscribe = "https://fcm.googleapis.com/fcm/connect/subscribe"
-	fcmEndpoint  = "https://fcm.googleapis.com/fcm/send/"
-	mtalkServer  = "mtalk.google.com:5228"
-	mcsDomain    = "mcs.android.com"
-	fcmVersion   = 41
+	fbInstallation = "https://firebaseinstallations.googleapis.com/v1/"
+	fbRegistration = "https://fcmregistrations.googleapis.com/v1/"
+	fcmEndpoint    = "https://fcm.googleapis.com/fcm/send/"
+	mtalkServer    = "mtalk.google.com:5228"
+	mcsDomain      = "mcs.android.com"
+	fcmVersion     = 41
 
 	// Packet defines
 
