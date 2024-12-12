@@ -1,6 +1,6 @@
 module github.com/crow-misia/go-push-receiver
 
-go 1.21
+go 1.21.0
 
 require (
 	github.com/crow-misia/http-ece v0.0.2
