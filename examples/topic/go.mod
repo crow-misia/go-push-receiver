@@ -1,6 +1,6 @@
 module topic
 
-go 1.21
+go 1.21.0
 
 require (
 	firebase.google.com/go/v4 v4.13.0
