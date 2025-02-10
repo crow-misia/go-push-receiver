@@ -15,26 +15,30 @@ import (
 
 func main() {
 	var (
-		senderId             string
+		apiKey               string
+		appId                string
+		projectId            string
 		credsFilename        string
 		persistentIdFilename string
 	)
 	flag.NewFlagSet("help", flag.ExitOnError)
-	flag.StringVar(&senderId, "sender-id", "", "FCM's sender ID (needed)")
+	flag.StringVar(&apiKey, "api-key", "", "FCM's API key (required)")
+	flag.StringVar(&appId, "app-id", "", "FCM's App ID (required)")
+	flag.StringVar(&projectId, "project-id", "", "FCM's Project ID (required)")
 	flag.StringVar(&credsFilename, "credentials", "credentials.json", "Credentials filename")
 	flag.StringVar(&persistentIdFilename, "persistent-id", "persistent_id.txt", "PersistentID filename")
 	flag.Parse()
 
-	if len(senderId) == 0 || len(credsFilename) == 0 {
+	if len(apiKey) == 0 || len(appId) == 0 || len(projectId) == 0 || len(credsFilename) == 0 {
 		flag.PrintDefaults()
 		return
 	}
 
 	ctx := context.Background()
-	realMain(ctx, senderId, credsFilename, persistentIdFilename)
+	realMain(ctx, apiKey, appId, projectId, credsFilename, persistentIdFilename)
 }
 
-func realMain(ctx context.Context, senderId, credsFilename, persistentIdFilename string) {
+func realMain(ctx context.Context, apiKey, appId, projectId, credsFilename, persistentIdFilename string) {
 	var creds *pr.FCMCredentials
 
 	logger := log.New(os.Stderr, "app : ", log.Lshortfile|log.Ldate|log.Ltime)
@@ -50,7 +54,7 @@ func realMain(ctx context.Context, senderId, credsFilename, persistentIdFilename
 		logger.Fatal(err)
 	}
 
-	fcmClient := pr.New(senderId,
+	fcmClient := pr.New(apiKey, appId, projectId,
 		pr.WithCreds(creds),
 		pr.WithHeartbeat(
 			pr.WithServerInterval(1*time.Minute),
