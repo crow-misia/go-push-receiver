@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"flag"
+	"log"
+
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
-	"flag"
 	"google.golang.org/api/option"
-	"log"
 )
 
 func main() {
