@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	pr "github.com/crow-misia/go-push-receiver"
 	"log"
 	"os"
 	"reflect"
 	"time"
+
+	pr "github.com/crow-misia/go-push-receiver"
 )
 
 func main() {
