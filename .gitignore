@@ -160,3 +160,13 @@ $RECYCLE.BIN/
 # Files for testing.
 serviceAccountKey.json
 credentials.json
+
+# Binary / Config for Example
+examples/**/*.json
+examples/**/*.txt
+examples/receiver/receiver
+examples/receiver/receiver.exe
+examples/sender/sender
+examples/sender/sender.exe
+examples/topic/topic
+examples/topic/topic.exe
