@@ -9,6 +9,7 @@ package pushreceiver
 
 import (
 	"crypto/tls"
+	"log/slog"
 	"net"
 )
 
@@ -16,9 +17,9 @@ import (
 type ClientOption func(*Client)
 
 // WithLogger is logger setter
-func WithLogger(logger logger) ClientOption {
+func WithLogger(logger *slog.Logger) ClientOption {
 	return func(client *Client) {
-		client.log = internalLog{logger}
+		client.logger = logger
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"reflect"
 	"time"
@@ -58,7 +59,7 @@ func realMain(ctx context.Context, senderId, credsFilename, persistentIdFilename
 			pr.WithClientInterval(2*time.Minute),
 			pr.WithAdaptive(true),
 		),
-		pr.WithLogger(log.New(os.Stderr, "push: ", log.Lshortfile|log.Ldate|log.Ltime)),
+		pr.WithLogger(slog.Default()),
 		pr.WithReceivedPersistentID(persistentIDs),
 	)
 

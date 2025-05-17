@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"io"
+	"log/slog"
 	"strconv"
 	"sync"
 	"time"
@@ -22,7 +23,7 @@ import (
 
 type mcs struct {
 	conn             *tls.Conn
-	log              ilogger
+	logger           *slog.Logger
 	creds            *FCMCredentials
 	writeTimeout     time.Duration
 	incomingStreamID int32
@@ -32,10 +33,10 @@ type mcs struct {
 	events           chan Event
 }
 
-func newMCS(conn *tls.Conn, log ilogger, creds *FCMCredentials, heartbeat *Heartbeat, events chan Event) *mcs {
+func newMCS(conn *tls.Conn, logger *slog.Logger, creds *FCMCredentials, heartbeat *Heartbeat, events chan Event) *mcs {
 	return &mcs{
 		conn:             conn,
-		log:              log,
+		logger:           logger,
 		creds:            creds,
 		incomingStreamID: 0,
 		heartbeatAck:     make(chan bool),
@@ -114,7 +115,7 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 		header = append(header, byte(tag))
 	}
 
-	mcs.log.Print("MCS request ", tag, request)
+	mcs.logger.Info("MCS request", "tag", tag, "message", request)
 
 	header = protowire.AppendVarint(header, uint64(proto.Size(request)))
 	data, err := proto.Marshal(request)
@@ -182,7 +183,7 @@ func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
 		}
 
 		// output receive
-		mcs.log.Print("MCS receive ", tag, receive)
+		mcs.logger.Info("MCS receive", "tag", tag, "message", receive)
 
 		// handling tag
 		if err := mcs.handleTag(receive); err != nil {

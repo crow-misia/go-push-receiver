@@ -11,12 +11,12 @@ package pushreceiver
 import (
 	"context"
 	"crypto/tls"
+	"github.com/pkg/errors"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // httpClient defines the minimal interface needed for an http.Client to be implemented.
@@ -27,7 +27,7 @@ type httpClient interface {
 // Client is FCM Push receive client.
 type Client struct {
 	senderID             string
-	log                  ilogger
+	logger               *slog.Logger
 	httpClient           httpClient
 	tlsConfig            *tls.Config
 	creds                *FCMCredentials
@@ -50,6 +50,29 @@ func New(senderID string, options ...ClientOption) *Client {
 		option(c)
 	}
 
+	// set defaults
+	c.setDefaultOptions()
+
+	c.logger.Debug("Config", "SenderID", c.senderID)
+
+	return c
+}
+
+func (c *Client) post(ctx context.Context, url string, body io.Reader, headerSetter func(*http.Header)) (*http.Response, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, errors.Wrap(err, "create post request error")
+	}
+	headerSetter(&req.Header)
+
+	return c.httpClient.Do(req)
+}
+
+// setDefaultOptions set default options.
+func (c *Client) setDefaultOptions() {
 	// set defaults
 	if c.backoff == nil {
 		c.backoff = NewBackoff(defaultBackoffBase*time.Second, defaultBackoffMax*time.Second)
@@ -79,26 +102,9 @@ func New(senderID string, options ...ClientOption) *Client {
 			},
 		}
 	}
-	if c.log == nil {
-		c.log = &discard{}
+	if c.logger == nil {
+		c.logger = slog.New(slog.DiscardHandler)
 	}
-
-	c.log.Print("Sender ID: ", c.senderID)
-
-	return c
-}
-
-func (c *Client) post(ctx context.Context, url string, body io.Reader, headerSetter func(*http.Header)) (*http.Response, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
-	if err != nil {
-		return nil, errors.Wrap(err, "create post request error")
-	}
-	headerSetter(&req.Header)
-
-	return c.httpClient.Do(req)
 }
 
 func closeResponse(res *http.Response) error {
