@@ -115,7 +115,7 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 		header = append(header, byte(tag))
 	}
 
-	mcs.logger.Info("MCS request", "tag", tag, "message", request)
+	mcs.logger.Debug("MCS request", "tag", tag, "message", request)
 
 	header = protowire.AppendVarint(header, uint64(proto.Size(request)))
 	data, err := proto.Marshal(request)
@@ -183,7 +183,7 @@ func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
 		}
 
 		// output receive
-		mcs.logger.Info("MCS receive", "tag", tag, "message", receive)
+		mcs.logger.Debug("MCS receive", "tag", tag, "message", receive)
 
 		// handling tag
 		if err := mcs.handleTag(receive); err != nil {
