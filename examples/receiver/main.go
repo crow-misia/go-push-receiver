@@ -65,7 +65,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 			pr.WithAdaptive(true),
 		),
 		pr.WithLogger(log),
-		pr.WithReceivedPersistentID(persistentIDs),
+		pr.WithReceivedPersistentId(persistentIDs),
 	)
 
 	go fcmClient.Subscribe(ctx)

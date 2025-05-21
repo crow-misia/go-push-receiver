@@ -37,7 +37,7 @@ type Client struct {
 	dialer               *net.Dialer
 	backoff              *Backoff
 	heartbeat            *Heartbeat
-	receivedPersistentID []string
+	receivedPersistentId []string
 	retryDisabled        bool
 	Events               chan Event
 }
