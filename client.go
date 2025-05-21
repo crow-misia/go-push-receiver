@@ -26,7 +26,10 @@ type httpClient interface {
 
 // Client is FCM Push receive client.
 type Client struct {
-	senderID             string
+	apiKey               string
+	projectId            string
+	appId                string
+	vapidKey             string
 	logger               *slog.Logger
 	httpClient           httpClient
 	tlsConfig            *tls.Config
@@ -40,10 +43,11 @@ type Client struct {
 }
 
 // New returns a new FCM push receive client instance.
-func New(senderID string, options ...ClientOption) *Client {
+func New(config *Config, options ...ClientOption) *Client {
 	c := &Client{
-		senderID: senderID,
-		Events:   make(chan Event, 50),
+		apiKey:    config.ApiKey,
+		projectId: config.ProjectId,
+		appId:     config.AppId,
 	}
 
 	for _, option := range options {
@@ -53,7 +57,7 @@ func New(senderID string, options ...ClientOption) *Client {
 	// set defaults
 	c.setDefaultOptions()
 
-	c.logger.Debug("Config", "SenderID", c.senderID)
+	c.logger.Debug("Config", "apiKey", c.apiKey, "projectId", c.projectId, "appId", c.appId)
 
 	return c
 }
@@ -104,6 +108,9 @@ func (c *Client) setDefaultOptions() {
 	}
 	if c.logger == nil {
 		c.logger = slog.New(slog.DiscardHandler)
+	}
+	if c.Events == nil {
+		c.Events = make(chan Event, 50)
 	}
 }
 

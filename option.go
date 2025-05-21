@@ -30,6 +30,13 @@ func WithCreds(creds *FCMCredentials) ClientOption {
 	}
 }
 
+// WithVapidKey is vapidKey setter
+func WithVapidKey(vapidKey string) ClientOption {
+	return func(client *Client) {
+		client.vapidKey = vapidKey
+	}
+}
+
 // WithReceivedPersistentID is received persistentId list setter
 func WithReceivedPersistentID(ids []string) ClientOption {
 	return func(client *Client) {
@@ -76,5 +83,12 @@ func WithDialer(dialer *net.Dialer) ClientOption {
 func WithRetry(retry bool) ClientOption {
 	return func(client *Client) {
 		client.retryDisabled = !retry
+	}
+}
+
+// WithEvents is Event channel setter
+func WithEvents(events chan Event) ClientOption {
+	return func(client *Client) {
+		client.Events = events
 	}
 }

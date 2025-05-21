@@ -12,12 +12,12 @@ import (
 	"context"
 	"fmt"
 	pb "github.com/crow-misia/go-push-receiver/pb/checkin"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -30,7 +30,6 @@ type gcmRegisterResponse struct {
 	token         string
 	androidID     uint64
 	securityToken uint64
-	appID         string
 }
 
 func (c *Client) registerGCM(ctx context.Context) (*gcmRegisterResponse, error) {
@@ -94,17 +93,16 @@ func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCh
 }
 
 func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken uint64) (*gcmRegisterResponse, error) {
-	appID := fmt.Sprintf("wp:receiver.push.com#%s", uuid.New())
-
 	values := url.Values{}
 	values.Set("app", "org.chromium.linux")
-	values.Set("X-subtype", appID)
-	values.Set("device", fmt.Sprint(androidID))
-	values.Set("sender", fcmServerKey)
+	values.Set("X-subtype", c.appId)
+	values.Set("device", strconv.FormatUint(androidID, 10))
+	values.Set("sender", c.vapidKey)
 
 	res, err := c.post(ctx, registerURL, strings.NewReader(values.Encode()), func(header *http.Header) {
 		header.Set("Content-Type", "application/x-www-form-urlencoded")
-		header.Set("Authorization", fmt.Sprintf("AidLogin %d:%d", androidID, securityToken))
+		header.Set("Authorization", fmt.Sprintf("AidLogin %s:%s", strconv.FormatUint(androidID, 10), strconv.FormatUint(securityToken, 10)))
+		header.Set("User-Agent", "")
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "request GCM register")
@@ -126,6 +124,5 @@ func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken
 		token:         token,
 		androidID:     androidID,
 		securityToken: securityToken,
-		appID:         appID,
 	}, nil
 }

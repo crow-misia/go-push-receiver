@@ -12,16 +12,18 @@ type tagType byte
 
 // GCM / FCM constants.
 const (
-	registerURL   = "https://android.clients.google.com/c2dm/register3"
-	checkinURL    = "https://android.clients.google.com/checkin"
-	chromeVersion = "63.0.3234.0"
-	fcmServerKey  = "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4"
+	registerURL             = "https://android.clients.google.com/c2dm/register3"
+	checkinURL              = "https://android.clients.google.com/checkin"
+	fcmEndpoint             = "https://fcm.googleapis.com/fcm/send/"
+	firebaseInstallationURL = "https://firebaseinstallations.googleapis.com/v1/"
+	firebaseRegistrationURL = "https://fcmregistrations.googleapis.com/v1/"
 
-	fcmSubscribe = "https://fcm.googleapis.com/fcm/connect/subscribe"
-	fcmEndpoint  = "https://fcm.googleapis.com/fcm/send/"
-	mtalkServer  = "mtalk.google.com:5228"
-	mcsDomain    = "mcs.android.com"
-	fcmVersion   = 41
+	defaultVapiKey = "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4"
+
+	mtalkServer   = "mtalk.google.com:5228"
+	mcsDomain     = "mcs.android.com"
+	chromeVersion = "63.0.3234.0"
+	fcmVersion    = 41
 
 	// Packet defines
 
