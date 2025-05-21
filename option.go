@@ -37,10 +37,10 @@ func WithVapidKey(vapidKey string) ClientOption {
 	}
 }
 
-// WithReceivedPersistentID is received persistentId list setter
-func WithReceivedPersistentID(ids []string) ClientOption {
+// WithReceivedPersistentId is received persistentId list setter
+func WithReceivedPersistentId(ids []string) ClientOption {
 	return func(client *Client) {
-		client.receivedPersistentID = ids
+		client.receivedPersistentId = ids
 	}
 }
 

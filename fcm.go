@@ -40,8 +40,8 @@ type fcmInstallResponse struct {
 
 // FCMCredentials is Credentials for FCM
 type FCMCredentials struct {
-	AppID         string `json:"appId"`
-	AndroidID     uint64 `json:"androidId"`
+	AppId         string `json:"appId"`
+	AndroidId     uint64 `json:"androidId"`
 	SecurityToken uint64 `json:"securityToken"`
 	Token         string `json:"token"`
 	PrivateKey    []byte `json:"privateKey"`
@@ -58,7 +58,7 @@ func (c *Client) Subscribe(ctx context.Context) {
 		if c.creds == nil {
 			err = c.register(ctx)
 		} else {
-			_, err = c.checkIn(ctx, &checkInOption{c.creds.AndroidID, c.creds.SecurityToken})
+			_, err = c.checkIn(ctx, &checkInOption{c.creds.AndroidId, c.creds.SecurityToken})
 		}
 		if err == nil {
 			// reset retry count when connection success
@@ -115,7 +115,7 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 	mcs := newMCS(conn, c.logger, c.creds, c.heartbeat, c.Events)
 	defer mcs.disconnect()
 
-	err = mcs.SendLoginPacket(c.receivedPersistentID)
+	err = mcs.SendLoginPacket(c.receivedPersistentId)
 	if err != nil {
 		return errors.Wrap(err, "send login packet failed")
 	}
@@ -167,11 +167,11 @@ func (c *Client) performRead(mcs *mcs) error {
 func (c *Client) onDataMessage(tagData interface{}) error {
 	switch data := tagData.(type) {
 	case *pb.LoginResponse:
-		c.receivedPersistentID = nil
+		c.receivedPersistentId = nil
 		c.Events <- &ConnectedEvent{data.GetServerTimestamp()}
 	case *pb.DataMessageStanza:
 		// To avoid error loops, last streamID is notified even when an error occurs.
-		c.receivedPersistentID = append(c.receivedPersistentID, data.GetPersistentId())
+		c.receivedPersistentId = append(c.receivedPersistentId, data.GetPersistentId())
 		event, err := decryptData(data, c.creds.PrivateKey, c.creds.AuthSecret)
 		if err != nil {
 			return err
@@ -271,8 +271,8 @@ func (c *Client) registerFCM(ctx context.Context, registerResponse *gcmRegisterR
 	}
 
 	// set responses.
-	credentials.AppID = c.appId
-	credentials.AndroidID = registerResponse.androidID
+	credentials.AppId = c.appId
+	credentials.AndroidId = registerResponse.androidId
 	credentials.SecurityToken = registerResponse.securityToken
 	credentials.Token = fcmRegisterResponse.Token
 
