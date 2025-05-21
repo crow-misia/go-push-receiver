@@ -1,0 +1,5 @@
+{
+	"apiKey": "This is the value of My Apps in the firebase console.",
+	"projectId": "This is the value of firebaseConfig in the SDK usage.",
+	"appId": "AppId"
+}

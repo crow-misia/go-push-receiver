@@ -111,7 +111,7 @@ func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
 			}
 		case <-pingDeadmanC:
 			// force disconnect
-			mcs.log.Print("force disconnect by heartbeat")
+			mcs.logger.Info("force disconnect by heartbeat")
 			mcs.disconnect()
 			return
 		case <-pingTickerC:

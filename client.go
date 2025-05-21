@@ -11,12 +11,12 @@ package pushreceiver
 import (
 	"context"
 	"crypto/tls"
+	"github.com/pkg/errors"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // httpClient defines the minimal interface needed for an http.Client to be implemented.
@@ -26,8 +26,11 @@ type httpClient interface {
 
 // Client is FCM Push receive client.
 type Client struct {
-	senderID             string
-	log                  ilogger
+	apiKey               string
+	projectId            string
+	appId                string
+	vapidKey             string
+	logger               *slog.Logger
 	httpClient           httpClient
 	tlsConfig            *tls.Config
 	creds                *FCMCredentials
@@ -40,16 +43,40 @@ type Client struct {
 }
 
 // New returns a new FCM push receive client instance.
-func New(senderID string, options ...ClientOption) *Client {
+func New(config *Config, options ...ClientOption) *Client {
 	c := &Client{
-		senderID: senderID,
-		Events:   make(chan Event, 50),
+		apiKey:    config.ApiKey,
+		projectId: config.ProjectId,
+		appId:     config.AppId,
 	}
 
 	for _, option := range options {
 		option(c)
 	}
 
+	// set defaults
+	c.setDefaultOptions()
+
+	c.logger.Debug("Config", "apiKey", c.apiKey, "projectId", c.projectId, "appId", c.appId)
+
+	return c
+}
+
+func (c *Client) post(ctx context.Context, url string, body io.Reader, headerSetter func(*http.Header)) (*http.Response, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, errors.Wrap(err, "create post request error")
+	}
+	headerSetter(&req.Header)
+
+	return c.httpClient.Do(req)
+}
+
+// setDefaultOptions set default options.
+func (c *Client) setDefaultOptions() {
 	// set defaults
 	if c.backoff == nil {
 		c.backoff = NewBackoff(defaultBackoffBase*time.Second, defaultBackoffMax*time.Second)
@@ -79,26 +106,12 @@ func New(senderID string, options ...ClientOption) *Client {
 			},
 		}
 	}
-	if c.log == nil {
-		c.log = &discard{}
+	if c.logger == nil {
+		c.logger = slog.New(slog.DiscardHandler)
 	}
-
-	c.log.Print("Sender ID: ", c.senderID)
-
-	return c
-}
-
-func (c *Client) post(ctx context.Context, url string, body io.Reader, headerSetter func(*http.Header)) (*http.Response, error) {
-	if ctx == nil {
-		ctx = context.Background()
+	if c.Events == nil {
+		c.Events = make(chan Event, 50)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
-	if err != nil {
-		return nil, errors.Wrap(err, "create post request error")
-	}
-	headerSetter(&req.Header)
-
-	return c.httpClient.Do(req)
 }
 
 func closeResponse(res *http.Response) error {

@@ -9,6 +9,7 @@ package pushreceiver
 
 import (
 	"crypto/tls"
+	"log/slog"
 	"net"
 )
 
@@ -16,9 +17,9 @@ import (
 type ClientOption func(*Client)
 
 // WithLogger is logger setter
-func WithLogger(logger logger) ClientOption {
+func WithLogger(logger *slog.Logger) ClientOption {
 	return func(client *Client) {
-		client.log = internalLog{logger}
+		client.logger = logger
 	}
 }
 
@@ -26,6 +27,13 @@ func WithLogger(logger logger) ClientOption {
 func WithCreds(creds *FCMCredentials) ClientOption {
 	return func(client *Client) {
 		client.creds = creds
+	}
+}
+
+// WithVapidKey is vapidKey setter
+func WithVapidKey(vapidKey string) ClientOption {
+	return func(client *Client) {
+		client.vapidKey = vapidKey
 	}
 }
 
@@ -75,5 +83,12 @@ func WithDialer(dialer *net.Dialer) ClientOption {
 func WithRetry(retry bool) ClientOption {
 	return func(client *Client) {
 		client.retryDisabled = !retry
+	}
+}
+
+// WithEvents is Event channel setter
+func WithEvents(events chan Event) ClientOption {
+	return func(client *Client) {
+		client.Events = events
 	}
 }

@@ -8,22 +8,34 @@
 package pushreceiver
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 	"github.com/pkg/errors"
 )
 
+type authToken struct {
+	Token string `json:"token"`
+}
+
 type fcmRegisterResponse struct {
 	Token   string `json:"token"`
 	PushSet string `json:"pushSet"`
+}
+
+type fcmInstallResponse struct {
+	Name         string    `json:"name"`
+	Fid          string    `json:"fid"`
+	RefreshToken string    `json:"refreshToken"`
+	AuthToken    authToken `json:"authToken"`
 }
 
 // FCMCredentials is Credentials for FCM
@@ -76,11 +88,15 @@ func (c *Client) Subscribe(ctx context.Context) {
 }
 
 func (c *Client) register(ctx context.Context) error {
-	response, err := c.registerGCM(ctx)
+	register, err := c.registerGCM(ctx)
 	if err != nil {
 		return err
 	}
-	creds, err := c.subscribeFCM(ctx, response)
+	install, err := c.installFCM(ctx)
+	if err != nil {
+		return err
+	}
+	creds, err := c.registerFCM(ctx, register, install)
 	if err != nil {
 		return err
 	}
@@ -96,7 +112,7 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 	}
 	defer conn.Close()
 
-	mcs := newMCS(conn, c.log, c.creds, c.heartbeat, c.Events)
+	mcs := newMCS(conn, c.logger, c.creds, c.heartbeat, c.Events)
 	defer mcs.disconnect()
 
 	err = mcs.SendLoginPacket(c.receivedPersistentID)
@@ -165,7 +181,54 @@ func (c *Client) onDataMessage(tagData interface{}) error {
 	return nil
 }
 
-func (c *Client) subscribeFCM(ctx context.Context, registerResponse *gcmRegisterResponse) (*FCMCredentials, error) {
+func (c *Client) installFCM(ctx context.Context) (*fcmInstallResponse, error) {
+	fid, err := generateFID()
+	if err != nil {
+		return nil, err
+	}
+
+	// refs. https://github.com/firebase/firebase-js-sdk/blob/main/packages/installations/src/util/constants.ts#L22
+	body := map[string]string{
+		"appId":       c.appId,
+		"authVersion": "FIS_v2",
+		"fid":         fid,
+		"sdkVersion":  "w:0.6.17",
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal FCM install request")
+	}
+
+	url := fmt.Sprintf("%sprojects/%s/installations", firebaseInstallationURL, c.projectId)
+
+	res, err := c.post(ctx, url, bytes.NewReader(bodyBytes), func(header *http.Header) {
+		header.Set("Accept", "application/json")
+		header.Set("Content-Type", "application/json")
+		header.Set("x-goog-api-key", c.apiKey)
+		// TODO heartbeat header.
+		// https://github.com/firebase/firebase-js-sdk/blob/main/packages/app/src/heartbeatService.ts
+		// https://github.com/firebase/firebase-js-sdk/blob/main/packages/installations/src/functions/create-installation-request.ts#L47
+		// header.Set("x-firebase-client", ...)
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "request FCM install")
+	}
+	defer closeResponse(res)
+
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return nil, errors.Errorf("server error: %s", res.Status)
+	}
+
+	var fcmInstallResponse fcmInstallResponse
+	err = json.NewDecoder(res.Body).Decode(&fcmInstallResponse)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshal FCM install response")
+	}
+
+	return &fcmInstallResponse, nil
+}
+
+func (c *Client) registerFCM(ctx context.Context, registerResponse *gcmRegisterResponse, installResponse *fcmInstallResponse) (*FCMCredentials, error) {
 	credentials := &FCMCredentials{}
 
 	err := credentials.appendCryptoInfo()
@@ -173,17 +236,28 @@ func (c *Client) subscribeFCM(ctx context.Context, registerResponse *gcmRegister
 		return nil, err
 	}
 
-	values := url.Values{}
-	values.Set("authorized_entity", c.senderID)
-	values.Set("endpoint", fcmEndpoint+registerResponse.token)
-	values.Set("encryption_key", base64.RawURLEncoding.EncodeToString(credentials.PublicKey))
-	values.Set("encryption_auth", base64.RawURLEncoding.EncodeToString(credentials.AuthSecret))
+	body := map[string]interface{}{
+		"web": map[string]string{
+			"applicationPubKey": c.vapidKey,
+			"endpoint":          fmt.Sprintf("%s/%s", fcmEndpoint, registerResponse.token),
+			"p256dh":            base64.RawURLEncoding.EncodeToString(credentials.PublicKey),
+			"auth":              base64.RawURLEncoding.EncodeToString(credentials.AuthSecret),
+		},
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal FCM register request")
+	}
 
-	res, err := c.post(ctx, fcmSubscribe, strings.NewReader(values.Encode()), func(header *http.Header) {
-		header.Set("Content-Type", "application/x-www-form-urlencoded")
+	url := fmt.Sprintf("%sprojects/%s/registrations", firebaseRegistrationURL, c.projectId)
+
+	res, err := c.post(ctx, url, bytes.NewReader(bodyBytes), func(header *http.Header) {
+		header.Set("Content-Type", "application/json")
+		header.Set("x-goog-api-key", c.apiKey)
+		header.Set("x-goog-firebase-installations-auth", fmt.Sprintf("FIS %s", installResponse.AuthToken.Token))
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "request FCM subscribe")
+		return nil, errors.Wrap(err, "request FCM register")
 	}
 	defer closeResponse(res)
 
@@ -191,17 +265,33 @@ func (c *Client) subscribeFCM(ctx context.Context, registerResponse *gcmRegister
 		return nil, errors.Errorf("server error: %s", res.Status)
 	}
 	var fcmRegisterResponse fcmRegisterResponse
-	decoder := json.NewDecoder(res.Body)
-	err = decoder.Decode(&fcmRegisterResponse)
+	err = json.NewDecoder(res.Body).Decode(&fcmRegisterResponse)
 	if err != nil {
-		return nil, errors.Wrap(err, "unmarshal FCM subscribe response")
+		return nil, errors.Wrap(err, "unmarshal FCM register response")
 	}
 
 	// set responses.
-	credentials.AppID = registerResponse.appID
+	credentials.AppID = c.appId
 	credentials.AndroidID = registerResponse.androidID
 	credentials.SecurityToken = registerResponse.securityToken
 	credentials.Token = fcmRegisterResponse.Token
 
 	return credentials, nil
+}
+
+func generateFID() (string, error) {
+	// refs. https://github.com/firebase/firebase-js-sdk/blob/main/packages/installations/src/helpers/generate-fid.ts
+
+	// A valid FID has exactly 22 base64 characters, which is 132 bits, or 16.5
+	// bytes. our implementation generates a 17 byte array instead.
+	fid := make([]byte, 17)
+	_, err := rand.Read(fid)
+	if err != nil {
+		return "", err
+	}
+
+	// Replace the first 4 random bits with the constant FID header of 0b0111.
+	fid[0] = 0b01110000 + (fid[0] % 0b00010000)
+
+	return base64.StdEncoding.EncodeToString(fid), nil
 }

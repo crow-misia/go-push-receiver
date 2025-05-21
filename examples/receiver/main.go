@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"reflect"
 	"time"
@@ -16,29 +17,32 @@ import (
 
 func main() {
 	var (
-		senderId             string
+		configFilename       string
 		credsFilename        string
 		persistentIdFilename string
 	)
 	flag.NewFlagSet("help", flag.ExitOnError)
-	flag.StringVar(&senderId, "sender-id", "", "FCM's sender ID (needed)")
+	flag.StringVar(&configFilename, "config", "config.json", "FCM's Config filename (needed)")
 	flag.StringVar(&credsFilename, "credentials", "credentials.json", "Credentials filename")
 	flag.StringVar(&persistentIdFilename, "persistent-id", "persistent_id.txt", "PersistentID filename")
 	flag.Parse()
 
-	if len(senderId) == 0 || len(credsFilename) == 0 {
+	if len(configFilename) == 0 || len(credsFilename) == 0 {
 		flag.PrintDefaults()
 		return
 	}
 
 	ctx := context.Background()
-	realMain(ctx, senderId, credsFilename, persistentIdFilename)
+	realMain(ctx, configFilename, credsFilename, persistentIdFilename)
 }
 
-func realMain(ctx context.Context, senderId, credsFilename, persistentIdFilename string) {
-	var creds *pr.FCMCredentials
-
+func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFilename string) {
 	logger := log.New(os.Stderr, "app : ", log.Lshortfile|log.Ldate|log.Ltime)
+
+	config, err := loadConfig(configFilename)
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	creds, err := loadCredentials(credsFilename)
 	if err != nil {
@@ -51,14 +55,14 @@ func realMain(ctx context.Context, senderId, credsFilename, persistentIdFilename
 		logger.Fatal(err)
 	}
 
-	fcmClient := pr.New(senderId,
+	fcmClient := pr.New(config,
 		pr.WithCreds(creds),
 		pr.WithHeartbeat(
 			pr.WithServerInterval(1*time.Minute),
 			pr.WithClientInterval(2*time.Minute),
 			pr.WithAdaptive(true),
 		),
-		pr.WithLogger(log.New(os.Stderr, "push: ", log.Lshortfile|log.Ldate|log.Ltime)),
+		pr.WithLogger(slog.Default()),
 		pr.WithReceivedPersistentID(persistentIDs),
 	)
 
@@ -100,6 +104,23 @@ func isExist(filename string) bool {
 	return err == nil
 }
 
+func loadConfig(filename string) (*pr.Config, error) {
+	if !isExist(filename) {
+		return nil, nil
+	}
+
+	f, err := os.Open(filename)
+	if f != nil {
+		defer f.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	config := &pr.Config{}
+	err = json.NewDecoder(f).Decode(config)
+	return config, err
+}
+
 func loadCredentials(filename string) (*pr.FCMCredentials, error) {
 	if !isExist(filename) {
 		return nil, nil
@@ -113,8 +134,7 @@ func loadCredentials(filename string) (*pr.FCMCredentials, error) {
 		return nil, err
 	}
 	creds := &pr.FCMCredentials{}
-	decoder := json.NewDecoder(f)
-	err = decoder.Decode(creds)
+	err = json.NewDecoder(f).Decode(creds)
 	return creds, err
 }
 

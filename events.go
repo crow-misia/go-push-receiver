@@ -44,7 +44,7 @@ type UpdateCredentialsEvent struct {
 	Credentials *FCMCredentials
 }
 
-// MessageEvent is receive message event.
+// MessageEvent is received message event.
 type MessageEvent struct {
 	PersistentID string `json:"persistentId"`
 	From         string `json:"from"`
