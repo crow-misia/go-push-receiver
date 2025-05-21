@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"log/slog"
+	"os"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
 	"google.golang.org/api/option"
 )
+
+var log = slog.Default()
 
 func main() {
 	var (
@@ -19,7 +22,7 @@ func main() {
 	)
 	flag.NewFlagSet("help", flag.ExitOnError)
 	flag.BoolVar(&unsubscribe, "unsubscribe", false, "topic unsubscribe")
-	flag.StringVar(&credentialsFilename, "credentials", "serviceAccountKey.json_push", "FCM's credentials filename")
+	flag.StringVar(&credentialsFilename, "credentials", "serviceAccountKey.json", "FCM's credentials filename")
 	flag.StringVar(&registrationToken, "token", "", "registration token")
 	flag.StringVar(&topic, "topic", "", "topic name")
 	flag.Parse()
@@ -37,11 +40,13 @@ func realMain(ctx context.Context, credentialsFilename string, unsubscribe bool,
 	config := firebase.Config{}
 	app, err := firebase.NewApp(ctx, &config, opt)
 	if err != nil {
-		log.Fatalf("error new application: %v", err)
+		log.Error("error new application:", "message", err)
+		os.Exit(-1)
 	}
 	client, err := app.Messaging(ctx)
 	if err != nil {
-		log.Fatalf("error getting Messaging client: %v", err)
+		log.Error("error getting Messaging client:", "message", err)
+		os.Exit(-1)
 	}
 
 	var response *messaging.TopicManagementResponse
@@ -51,8 +56,9 @@ func realMain(ctx context.Context, credentialsFilename string, unsubscribe bool,
 		response, err = client.SubscribeToTopic(ctx, []string{registrationToken}, topic)
 	}
 	if err != nil {
-		log.Fatalf("fcm error: %v", err)
+		log.Error("fcm error:", "message", err)
+		os.Exit(-1)
 	}
 
-	log.Printf("Successfully: %d, %d", response.SuccessCount, response.FailureCount)
+	log.Info("Successfully:", "success", response.SuccessCount, "failure", response.FailureCount)
 }

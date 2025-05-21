@@ -4,13 +4,16 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
 	"google.golang.org/api/option"
 )
+
+var log = slog.Default()
 
 func main() {
 	var (
@@ -39,11 +42,13 @@ func realMain(ctx context.Context, credentialsFilename string, ttl int, registra
 	config := firebase.Config{}
 	app, err := firebase.NewApp(ctx, &config, opt)
 	if err != nil {
-		log.Fatalf("error new application: %v", err)
+		log.Error("error new application:", "message", err)
+		os.Exit(-1)
 	}
 	client, err := app.Messaging(ctx)
 	if err != nil {
-		log.Fatalf("error getting Messaging client: %v", err)
+		log.Error("error getting Messaging client:", "message", err)
+		os.Exit(-1)
 	}
 
 	headers := map[string]string{}
@@ -68,9 +73,10 @@ func realMain(ctx context.Context, credentialsFilename string, ttl int, registra
 	// registration token.
 	response, err := client.Send(ctx, message)
 	if err != nil {
-		log.Fatalf("fcm send error: %v", err)
+		log.Error("fcm send error:", "message", err)
+		os.Exit(-1)
 	}
 
 	// Response is a message ID string.
-	log.Printf("Successfully sent message: %s", response)
+	log.Info("Successfully sent message:", "response", response)
 }
