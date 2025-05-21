@@ -18,7 +18,7 @@ const (
 	firebaseInstallationURL = "https://firebaseinstallations.googleapis.com/v1/"
 	firebaseRegistrationURL = "https://fcmregistrations.googleapis.com/v1/"
 
-	defaultVapiKey = "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4"
+	fcmServerKey = "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4"
 
 	mtalkServer   = "mtalk.google.com:5228"
 	mcsDomain     = "mcs.android.com"
