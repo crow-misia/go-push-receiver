@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/pkg/errors"
 	"log/slog"
 	"os"
 	"reflect"
@@ -51,7 +52,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 	}
 
 	// load received persistent ids
-	persistentIDs, err := loadPersistentIDs(persistentIdFilename)
+	persistentIdList, err := loadPersistentIdList(persistentIdFilename)
 	if err != nil {
 		log.Error("failed load persistentIDs", "message", err)
 		os.Exit(-1)
@@ -65,7 +66,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 			pr.WithAdaptive(true),
 		),
 		pr.WithLogger(log),
-		pr.WithReceivedPersistentId(persistentIDs),
+		pr.WithReceivedPersistentId(persistentIdList),
 	)
 
 	go fcmClient.Subscribe(ctx)
@@ -79,7 +80,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 				os.Exit(-1)
 			}
 		case *pr.ConnectedEvent:
-			if err := clearPersistentID(persistentIdFilename); err != nil {
+			if err := clearPersistentId(persistentIdFilename); err != nil {
 				log.Error("failed clear credentials", "message", err)
 				os.Exit(-1)
 			}
@@ -91,7 +92,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 			log.Info("Received message:", "data", string(ev.Data), "persistentId", ev.PersistentId)
 
 			// save persistentID
-			if err := savePersistentID(persistentIdFilename, ev.PersistentId); err != nil {
+			if err := savePersistentId(persistentIdFilename, ev.PersistentId); err != nil {
 				log.Error("failed save persistentId", "message", err)
 				os.Exit(-1)
 			}
@@ -111,7 +112,7 @@ func isExist(filename string) bool {
 
 func loadConfig(filename string) (*pr.Config, error) {
 	if !isExist(filename) {
-		return nil, nil
+		return nil, errors.New("config file not found")
 	}
 
 	f, err := os.Open(filename)
@@ -126,7 +127,7 @@ func loadConfig(filename string) (*pr.Config, error) {
 
 func loadCredentials(filename string) (*pr.FCMCredentials, error) {
 	if !isExist(filename) {
-		return nil, nil
+		return nil, errors.New("credentials file not found")
 	}
 
 	f, err := os.Open(filename)
@@ -151,37 +152,37 @@ func saveCredentials(filename string, credentials *pr.FCMCredentials) error {
 	return encoder.Encode(credentials)
 }
 
-func loadPersistentIDs(filename string) ([]string, error) {
-	var persistentIDs []string
+func loadPersistentIdList(filename string) ([]string, error) {
+	persistentIdList := make([]string, 0, 100)
 
 	if !isExist(filename) {
-		return persistentIDs, nil
+		return persistentIdList, nil
 	}
 
 	f, err := os.Open(filename)
 	if err != nil {
-		return persistentIDs, err
+		return persistentIdList, err
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
-		persistentIDs = append(persistentIDs, scanner.Text())
+		persistentIdList = append(persistentIdList, scanner.Text())
 	}
-	return persistentIDs, nil
+	return persistentIdList, nil
 }
 
-func savePersistentID(filename, persistentID string) error {
+func savePersistentId(filename, persistentId string) error {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	_, err = f.WriteString(fmt.Sprintln(persistentID))
+	_, err = f.WriteString(fmt.Sprintln(persistentId))
 	return err
 }
 
-func clearPersistentID(filename string) error {
+func clearPersistentId(filename string) error {
 	if isExist(filename) {
 		return os.Remove(filename)
 	}
