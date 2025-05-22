@@ -33,23 +33,22 @@ type mcs struct {
 	events           chan Event
 }
 
-func newMCS(conn *tls.Conn, logger *slog.Logger, creds *FCMCredentials, heartbeat *Heartbeat, events chan Event) *mcs {
+func (c *Client) newMCS(conn *tls.Conn) *mcs {
 	return &mcs{
 		conn:             conn,
-		logger:           logger,
-		creds:            creds,
+		logger:           c.logger,
+		creds:            c.creds,
 		incomingStreamId: 0,
 		heartbeatAck:     make(chan bool),
-		heartbeat:        heartbeat,
-		events:           events,
+		heartbeat:        c.heartbeat,
+		events:           c.Events,
 	}
 }
 
-func (mcs *mcs) disconnect() {
+func (mcs *mcs) disconnect(reason string) {
 	mcs.disconnectDm.Do(func() {
 		close(mcs.heartbeatAck)
-		_ = mcs.conn.Close()
-		mcs.events <- &DisconnectedEvent{}
+		mcs.events <- &DisconnectedEvent{Reason: reason}
 	})
 }
 

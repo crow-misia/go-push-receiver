@@ -106,14 +106,17 @@ func (c *Client) register(ctx context.Context) error {
 }
 
 func (c *Client) tryToConnect(ctx context.Context) error {
+	childCtx, cancelChild := context.WithCancel(ctx)
+	defer cancelChild()
+
 	conn, err := tls.DialWithDialer(c.dialer, "tcp", mtalkServer, c.tlsConfig)
 	if err != nil {
 		return errors.Wrap(err, "dial failed to FCM")
 	}
 	defer conn.Close()
 
-	mcs := newMCS(conn, c.logger, c.creds, c.heartbeat, c.Events)
-	defer mcs.disconnect()
+	mcs := c.newMCS(conn)
+	defer mcs.disconnect("disconnect")
 
 	err = mcs.SendLoginPacket(c.receivedPersistentId)
 	if err != nil {
@@ -121,13 +124,23 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 	}
 
 	// start heartbeat
-	go c.heartbeat.start(ctx, mcs)
+	go c.heartbeat.start(
+		childCtx,
+		c.logger,
+		mcs.heartbeatAck,
+		func() error {
+			return mcs.SendHeartbeatPingPacket()
+		},
+		func() {
+			mcs.disconnect("heartbeat")
+			cancelChild()
+		})
 
 	select {
 	case err := <-c.asyncPerformRead(mcs):
 		return err
-	case <-ctx.Done():
-		return ctx.Err()
+	case <-childCtx.Done():
+		return childCtx.Err()
 	}
 }
 
