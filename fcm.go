@@ -170,7 +170,7 @@ func (c *Client) onDataMessage(tagData interface{}) error {
 		c.receivedPersistentId = nil
 		c.Events <- &ConnectedEvent{data.GetServerTimestamp()}
 	case *pb.DataMessageStanza:
-		// To avoid error loops, last streamID is notified even when an error occurs.
+		// To avoid error loops, last streamId is notified even when an error occurs.
 		c.receivedPersistentId = append(c.receivedPersistentId, data.GetPersistentId())
 		event, err := decryptData(data, c.creds.PrivateKey, c.creds.AuthSecret)
 		if err != nil {

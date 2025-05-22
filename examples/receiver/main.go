@@ -54,7 +54,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 	// load received persistent ids
 	persistentIdList, err := loadPersistentIdList(persistentIdFilename)
 	if err != nil {
-		log.Error("failed load persistentIDs", "message", err)
+		log.Error("failed load persistentID list", "message", err)
 		os.Exit(-1)
 	}
 
@@ -91,7 +91,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 		case *pr.MessageEvent:
 			log.Info("Received message:", "data", string(ev.Data), "persistentId", ev.PersistentId)
 
-			// save persistentID
+			// save persistentId
 			if err := savePersistentId(persistentIdFilename, ev.PersistentId); err != nil {
 				log.Error("failed save persistentId", "message", err)
 				os.Exit(-1)
