@@ -130,7 +130,7 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 
 func (mcs *mcs) ReceiveVersion() error {
 	buf := make([]byte, versionPacketLen)
-	length, err := mcs.conn.Read(buf)
+	length, err := io.ReadFull(mcs.conn, buf)
 	if err != nil {
 		return errors.Wrap(err, "receive version packet")
 	}
@@ -156,43 +156,34 @@ func (mcs *mcs) PerformReadTag() (interface{}, error) {
 	}
 
 	// receive data
-	offset := 0
 	buf := make([]byte, size)
-	for {
-		length, err := mcs.conn.Read(buf[offset:])
-		if err != nil {
-			return nil, errors.Wrap(err, "receive data packet")
-		}
-		offset += length
-		if offset >= size {
-			break
-		}
+	_, err = io.ReadFull(mcs.conn, buf)
+	if err != nil {
+		return nil, errors.Wrap(err, "receive data packet")
 	}
 
 	return mcs.UnmarshalTagData(tag, buf)
 }
 
 func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
-	var receive interface{}
-
-	receiveGenerator, exists := tagMapping[tag]
-	if exists {
-		receive = receiveGenerator()
-		if err := proto.Unmarshal(buf, receive.(proto.Message)); err != nil {
-			return receive, errors.Wrapf(err, "unmarshal tag(%x) data", tag)
-		}
-
-		// output receive
-		mcs.logger.Debug("MCS receive", "tag", tag, "message", receive)
-
-		// handling tag
-		if err := mcs.handleTag(receive); err != nil {
-			return receive, errors.Wrap(err, "handling failed.")
-		}
-
-		return receive, nil
+	receive := tag.GenerateMessage()
+	if receive == nil {
+		return nil, errors.Errorf("unknown tag: %x", tag)
 	}
-	return nil, errors.Errorf("unknown tag: %x", tag)
+
+	if err := proto.Unmarshal(buf, receive.(proto.Message)); err != nil {
+		return receive, errors.Wrapf(err, "unmarshal tag(%x) data", tag)
+	}
+
+	// output receive
+	mcs.logger.Debug("MCS receive", "tag", tag, "message", receive)
+
+	// handling tag
+	if err := mcs.handleTag(receive); err != nil {
+		return receive, errors.Wrap(err, "handling failed.")
+	}
+
+	return receive, nil
 }
 
 func (mcs *mcs) handleTag(receive interface{}) error {
@@ -220,17 +211,17 @@ func (mcs *mcs) updateIncomingStreamID(lastStreamIdReceived int32) {
 
 func (mcs *mcs) receiveTag() (tagType, error) {
 	buf := make([]byte, tagPacketLen)
-	n, err := mcs.conn.Read(buf)
+	n, err := io.ReadFull(mcs.conn, buf)
 	if err != nil {
-		return 0, err
+		return tagUnknown, err
 	}
 	if n == 0 {
-		return 0, io.ErrClosedPipe
+		return tagUnknown, io.ErrClosedPipe
 	}
 	return tagType(buf[0]), nil
 }
 
-func (mcs *mcs) receiveSize() (int, error) {
+func (mcs *mcs) receiveSize() (uint64, error) {
 	offset := 0
 	buf := make([]byte, sizePacketLenMax)
 	for {
@@ -242,23 +233,9 @@ func (mcs *mcs) receiveSize() (int, error) {
 			return 0, err
 		}
 		offset += length
-		n, n2 := protowire.ConsumeVarint(buf[0:offset])
-		if n2 > 0 {
-			return int(n), nil
+		v, n := protowire.ConsumeVarint(buf[0:offset])
+		if n > 0 {
+			return v, nil
 		}
 	}
-}
-
-type tagMessageGenerator func() interface{}
-
-// Tag mappings.
-var tagMapping = map[tagType]tagMessageGenerator{
-	tagHeartbeatPing:     func() interface{} { return &pb.HeartbeatPing{} },
-	tagHeartbeatAck:      func() interface{} { return &pb.HeartbeatAck{} },
-	tagLoginRequest:      func() interface{} { return &pb.LoginRequest{} },
-	tagLoginResponse:     func() interface{} { return &pb.LoginResponse{} },
-	tagClose:             func() interface{} { return &pb.Close{} },
-	tagIqStanza:          func() interface{} { return &pb.IqStanza{} },
-	tagDataMessageStanza: func() interface{} { return &pb.DataMessageStanza{} },
-	tagStreamErrorStanza: func() interface{} { return &pb.StreamErrorStanza{} },
 }
