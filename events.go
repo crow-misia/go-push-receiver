@@ -28,7 +28,7 @@ type RetryEvent struct {
 
 // DisconnectedEvent is disconnect event.
 type DisconnectedEvent struct {
-	ErrorObj error
+	Reason string
 }
 
 // HeartbeatEvent is send/received heartbeat event.

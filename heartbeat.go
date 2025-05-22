@@ -9,6 +9,7 @@ package pushreceiver
 
 import (
 	"context"
+	"log/slog"
 	"time"
 )
 
@@ -64,7 +65,7 @@ func newHeartbeat(options ...HeartbeatOption) *Heartbeat {
 	return h
 }
 
-func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
+func (h *Heartbeat) start(ctx context.Context, logger *slog.Logger, heartbeatAck chan bool, sendHeartbeat func() error, onDisconnect func()) {
 	if h.deadmanTimeout <= 0 {
 		if h.clientInterval < h.serverInterval {
 			h.deadmanTimeout = durationDeadmanTimeout(h.serverInterval)
@@ -82,6 +83,7 @@ func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
 		pingDeadmanC = pingDeadman.C
 	}
 	defer func() {
+		logger.Debug("heartbeat stoped")
 		if pingDeadman != nil {
 			pingDeadman.Stop()
 		}
@@ -105,18 +107,18 @@ func (h *Heartbeat) start(ctx context.Context, mcs *mcs) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-mcs.heartbeatAck:
+		case <-heartbeatAck:
 			if pingDeadman != nil {
 				pingDeadman.Reset(h.deadmanTimeout)
 			}
 		case <-pingDeadmanC:
 			// force disconnect
-			mcs.logger.Info("force disconnect by heartbeat")
-			mcs.disconnect()
+			logger.Info("force disconnect by heartbeat")
+			onDisconnect()
 			return
 		case <-pingTickerC:
 			// send heartbeat to FCM
-			err := mcs.SendHeartbeatPingPacket()
+			err := sendHeartbeat()
 			if err != nil {
 				return
 			}
