@@ -7,9 +7,6 @@
 
 package pushreceiver
 
-// tagType is FCM Request/Response Tag type
-type tagType byte
-
 // GCM / FCM constants.
 const (
 	registerURL             = "https://android.clients.google.com/c2dm/register3"
@@ -51,25 +48,4 @@ const (
 
 	// Default Heartbeat period (minutes)
 	defaultHeartbeatPeriod = 10
-)
-
-// Tag enumeration.
-const (
-	tagHeartbeatPing       tagType = 0
-	tagHeartbeatAck        tagType = 1
-	tagLoginRequest        tagType = 2
-	tagLoginResponse       tagType = 3
-	tagClose               tagType = 4
-	tagMessageStanza       tagType = 5
-	tagPresenceStanza      tagType = 6
-	tagIqStanza            tagType = 7
-	tagDataMessageStanza   tagType = 8
-	tagBatchPresenceStanza tagType = 9
-	tagStreamErrorStanza   tagType = 10
-	tagHTTPRequest         tagType = 11
-	tagHTTPResponse        tagType = 12
-	tagBindAccountRequest  tagType = 13
-	tagBindAccountResponse tagType = 14
-	tagTalkMetadata        tagType = 15
-	tagNumProtoTypes       tagType = 16
 )
