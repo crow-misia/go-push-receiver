@@ -127,7 +127,7 @@ func loadConfig(filename string) (*pr.Config, error) {
 
 func loadCredentials(filename string) (*pr.FCMCredentials, error) {
 	if !isExist(filename) {
-		return nil, errors.New("credentials file not found")
+		return nil, nil
 	}
 
 	f, err := os.Open(filename)
