@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/protobuf/proto"
 	"net/http"
 	"time"
 
@@ -177,7 +178,7 @@ func (c *Client) performRead(mcs *mcs) error {
 	}
 }
 
-func (c *Client) onDataMessage(tagData interface{}) error {
+func (c *Client) onDataMessage(tagData proto.Message) error {
 	switch data := tagData.(type) {
 	case *pb.LoginResponse:
 		c.receivedPersistentId = nil

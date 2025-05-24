@@ -10,6 +10,7 @@ package pushreceiver
 import (
 	"fmt"
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
+	"google.golang.org/protobuf/proto"
 )
 
 // tagType is FCM Request/Response Tag type
@@ -79,7 +80,7 @@ func (t tagType) String() string {
 }
 
 // GenerateMessage Generate Tag Message
-func (t tagType) GenerateMessage() interface{} {
+func (t tagType) GenerateMessage() proto.Message {
 	switch t {
 	case tagHeartbeatPing:
 		return &pb.HeartbeatPing{}

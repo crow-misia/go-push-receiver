@@ -12,6 +12,7 @@ import (
 	"fmt"
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"io"
@@ -114,7 +115,9 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 		header = append(header, byte(tag))
 	}
 
-	mcs.logger.Debug("MCS request", "tag", tag, "message", request)
+	if mcs.logger.Enabled(nil, slog.LevelDebug) {
+		mcs.logger.Debug("MCS request", "tag", tag, "message", protojson.Format(request))
+	}
 
 	header = protowire.AppendVarint(header, uint64(proto.Size(request)))
 	data, err := proto.Marshal(request)
@@ -139,7 +142,7 @@ func (mcs *mcs) ReceiveVersion() error {
 	return nil
 }
 
-func (mcs *mcs) PerformReadTag() (interface{}, error) {
+func (mcs *mcs) PerformReadTag() (proto.Message, error) {
 	var err error
 
 	// receive tag
@@ -164,18 +167,20 @@ func (mcs *mcs) PerformReadTag() (interface{}, error) {
 	return mcs.UnmarshalTagData(tag, buf)
 }
 
-func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
+func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (proto.Message, error) {
 	receive := tag.GenerateMessage()
 	if receive == nil {
 		return nil, errors.Errorf("unknown tag: %x", tag)
 	}
 
-	if err := proto.Unmarshal(buf, receive.(proto.Message)); err != nil {
+	if err := proto.Unmarshal(buf, receive); err != nil {
 		return receive, errors.Wrapf(err, "unmarshal tag(%x) data", tag)
 	}
 
 	// output receive
-	mcs.logger.Debug("MCS receive", "tag", tag, "message", receive)
+	if mcs.logger.Enabled(nil, slog.LevelDebug) {
+		mcs.logger.Debug("MCS receive", "tag", tag, "message", protojson.Format(receive))
+	}
 
 	// handling tag
 	if err := mcs.handleTag(receive); err != nil {
@@ -185,7 +190,7 @@ func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (interface{}, error) {
 	return receive, nil
 }
 
-func (mcs *mcs) handleTag(receive interface{}) error {
+func (mcs *mcs) handleTag(receive proto.Message) error {
 	switch receive.(type) {
 	case *pb.HeartbeatPing:
 		mcs.updateIncomingStreamId((*receive.(*pb.HeartbeatPing)).GetLastStreamIdReceived())
