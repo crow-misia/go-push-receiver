@@ -11,7 +11,8 @@ package pushreceiver
 const (
 	registerURL             = "https://android.clients.google.com/c2dm/register3"
 	checkinURL              = "https://android.clients.google.com/checkin"
-	fcmEndpoint             = "https://fcm.googleapis.com/fcm/send/"
+	fcmLegacyEndpoint       = "https://fcm.googleapis.com/fcm/send/%s"
+	fcmV1Endpoint           = "https://fcm.googleapis.com/v1/projects/%s/messages:send"
 	firebaseInstallationURL = "https://firebaseinstallations.googleapis.com/v1/"
 	firebaseRegistrationURL = "https://fcmregistrations.googleapis.com/v1/"
 
@@ -21,6 +22,8 @@ const (
 	mcsDomain     = "mcs.android.com"
 	chromeVersion = "63.0.3234.0"
 	fcmVersion    = 41
+	sdkVersion    = "w:0.6.17"
+	authVersion   = "FIS_v2"
 
 	// Packet defines
 

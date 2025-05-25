@@ -168,5 +168,7 @@ examples/receiver/receiver
 examples/receiver/receiver.exe
 examples/sender/sender
 examples/sender/sender.exe
+examples/sender-vapid/sender-vapid
+examples/sender-vapid/sender-vapid.exe
 examples/topic/topic
 examples/topic/topic.exe

@@ -30,13 +30,6 @@ func WithCreds(creds *FCMCredentials) ClientOption {
 	}
 }
 
-// WithVapidKey is vapidKey setter
-func WithVapidKey(vapidKey string) ClientOption {
-	return func(client *Client) {
-		client.vapidKey = vapidKey
-	}
-}
-
 // WithReceivedPersistentId is received persistentId list setter
 func WithReceivedPersistentId(ids []string) ClientOption {
 	return func(client *Client) {

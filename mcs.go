@@ -116,7 +116,7 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 	}
 
 	if mcs.logger.Enabled(nil, slog.LevelDebug) {
-		mcs.logger.Debug("MCS request", "tag", tag, "message", protojson.Format(request))
+		mcs.logger.Debug("MCS request", "tag", tag, "message", protojson.MarshalOptions{Multiline: false}.Format(request))
 	}
 
 	header = protowire.AppendVarint(header, uint64(proto.Size(request)))
@@ -179,7 +179,7 @@ func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (proto.Message, error)
 
 	// output receive
 	if mcs.logger.Enabled(nil, slog.LevelDebug) {
-		mcs.logger.Debug("MCS receive", "tag", tag, "message", protojson.Format(receive))
+		mcs.logger.Debug("MCS receive", "tag", tag, "message", protojson.MarshalOptions{Multiline: false}.Format(receive))
 	}
 
 	// handling tag

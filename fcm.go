@@ -27,6 +27,23 @@ type authToken struct {
 	Token string `json:"token"`
 }
 
+type fcmWebpush struct {
+	ApplicationPubKey string      `json:"applicationPubKey,omitempty"`
+	Endpoint          interface{} `json:"endpoint"`
+	P256Dh            interface{} `json:"p256dh"`
+	Auth              interface{} `json:"auth"`
+}
+type fcmRegisterRequest struct {
+	Web fcmWebpush `json:"web"`
+}
+
+type fcmInstallRequest struct {
+	AppId       string `json:"appId"`
+	AuthVersion string `json:"authVersion"`
+	Fid         string `json:"fid"`
+	SdkVersion  string `json:"sdkVersion"`
+}
+
 type fcmRegisterResponse struct {
 	Token   string `json:"token"`
 	PushSet string `json:"pushSet"`
@@ -43,6 +60,7 @@ type fcmInstallResponse struct {
 type FCMCredentials struct {
 	AppId         string `json:"appId"`
 	AndroidId     uint64 `json:"androidId"`
+	Endpoint      string `json:"endpoint"`
 	SecurityToken uint64 `json:"securityToken"`
 	Token         string `json:"token"`
 	PrivateKey    []byte `json:"privateKey"`
@@ -50,7 +68,7 @@ type FCMCredentials struct {
 	AuthSecret    []byte `json:"authSecret"`
 }
 
-// Subscribe subscribe to FCM.
+// Subscribe to FCM.
 func (c *Client) Subscribe(ctx context.Context) {
 	defer close(c.Events)
 
@@ -186,7 +204,7 @@ func (c *Client) onDataMessage(tagData proto.Message) error {
 	case *pb.DataMessageStanza:
 		// To avoid error loops, last streamId is notified even when an error occurs.
 		c.receivedPersistentId = append(c.receivedPersistentId, data.GetPersistentId())
-		event, err := decryptData(data, c.creds.PrivateKey, c.creds.AuthSecret)
+		event, err := decryptData(data, c.creds)
 		if err != nil {
 			return err
 		}
@@ -202,11 +220,11 @@ func (c *Client) installFCM(ctx context.Context) (*fcmInstallResponse, error) {
 	}
 
 	// refs. https://github.com/firebase/firebase-js-sdk/blob/main/packages/installations/src/util/constants.ts#L22
-	body := map[string]string{
-		"appId":       c.appId,
-		"authVersion": "FIS_v2",
-		"fid":         fid,
-		"sdkVersion":  "w:0.6.17",
+	body := fcmInstallRequest{
+		AppId:       c.appId,
+		AuthVersion: authVersion,
+		Fid:         fid,
+		SdkVersion:  sdkVersion,
 	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
@@ -250,12 +268,13 @@ func (c *Client) registerFCM(ctx context.Context, registerResponse *gcmRegisterR
 		return nil, err
 	}
 
-	body := map[string]interface{}{
-		"web": map[string]string{
-			"applicationPubKey": c.vapidKey,
-			"endpoint":          fmt.Sprintf("%s/%s", fcmEndpoint, registerResponse.token),
-			"p256dh":            base64.RawURLEncoding.EncodeToString(credentials.PublicKey),
-			"auth":              base64.RawURLEncoding.EncodeToString(credentials.AuthSecret),
+	endpoint := fmt.Sprintf(fcmLegacyEndpoint, registerResponse.token)
+	body := fcmRegisterRequest{
+		Web: fcmWebpush{
+			ApplicationPubKey: c.vapidKey,
+			Endpoint:          endpoint,
+			P256Dh:            base64.URLEncoding.EncodeToString(credentials.PublicKey),
+			Auth:              base64.URLEncoding.EncodeToString(credentials.AuthSecret),
 		},
 	}
 	bodyBytes, err := json.Marshal(body)
@@ -289,6 +308,7 @@ func (c *Client) registerFCM(ctx context.Context, registerResponse *gcmRegisterR
 	credentials.AndroidId = registerResponse.androidId
 	credentials.SecurityToken = registerResponse.securityToken
 	credentials.Token = fcmRegisterResponse.Token
+	credentials.Endpoint = endpoint
 
 	return credentials, nil
 }

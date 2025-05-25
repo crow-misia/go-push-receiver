@@ -149,6 +149,7 @@ func saveCredentials(filename string, credentials *pr.FCMCredentials) error {
 		return err
 	}
 	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "  ")
 	return encoder.Encode(credentials)
 }
 

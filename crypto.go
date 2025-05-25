@@ -25,9 +25,9 @@ func (c *FCMCredentials) appendCryptoInfo() error {
 		return errors.Wrap(err, "generate random key for FCM")
 	}
 
-	authSecret, err := generateSalt()
+	authSecret, err := generateAuthSecret()
 	if err != nil {
-		return errors.Wrap(err, "generate random salt for FCM")
+		return errors.Wrap(err, "generate random auth secret for FCM")
 	}
 
 	c.PrivateKey = privateKey
@@ -37,7 +37,25 @@ func (c *FCMCredentials) appendCryptoInfo() error {
 	return nil
 }
 
-func decryptData(data *pb.DataMessageStanza, privateKey []byte, authSecret []byte) (*MessageEvent, error) {
+func decryptData(data *pb.DataMessageStanza, creds *FCMCredentials) (*MessageEvent, error) {
+	var bytes []byte
+	var err error
+
+	contentEncoding, err := findByKey(data.GetAppData(), "content-encoding")
+	if err == nil && *contentEncoding.Value == "aes128gcm" {
+		bytes, err = decryptDataV1(data, creds)
+	} else {
+		bytes, err = decryptDataLegacy(data, creds)
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "decrypt HTTP-ECE data")
+	}
+	return newMessageEvent(data, bytes), nil
+}
+
+func decryptDataLegacy(data *pb.DataMessageStanza, creds *FCMCredentials) ([]byte, error) {
+	rawData := data.GetRawData()
+
 	cryptoKeyData, err := findByKey(data.GetAppData(), "crypto-key")
 	if err != nil {
 		return nil, errors.Wrap(err, "dh is not provided")
@@ -57,17 +75,23 @@ func decryptData(data *pb.DataMessageStanza, privateKey []byte, authSecret []byt
 		return nil, errors.Wrap(err, "decode salt")
 	}
 
-	bytes, err := ece.Decrypt(data.GetRawData(),
+	return ece.Decrypt(rawData,
 		ece.WithEncoding(ece.AESGCM),
-		ece.WithPrivate(privateKey),
+		ece.WithPrivate(creds.PrivateKey),
+		ece.WithAuthSecret(creds.AuthSecret),
 		ece.WithDh(cryptoKey),
 		ece.WithSalt(salt),
-		ece.WithAuthSecret(authSecret),
 	)
-	if err != nil {
-		return nil, errors.Wrap(err, "decrypt HTTP-ECE data")
-	}
-	return newMessageEvent(data, bytes), nil
+}
+
+func decryptDataV1(data *pb.DataMessageStanza, creds *FCMCredentials) ([]byte, error) {
+	rawData := data.GetRawData()
+
+	return ece.Decrypt(rawData,
+		ece.WithEncoding(ece.AES128GCM),
+		ece.WithPrivate(creds.PrivateKey),
+		ece.WithAuthSecret(creds.AuthSecret),
+	)
 }
 
 // generateKey generates for public key crypto.
@@ -81,8 +105,8 @@ func generateKey(curve ecdh.Curve) (private []byte, public []byte, err error) {
 	return privateKey.Bytes(), publicKey.Bytes(), nil
 }
 
-// generateSalt generates salt.
-func generateSalt() ([]byte, error) {
+// generateAuthSecret generates authSecret.
+func generateAuthSecret() ([]byte, error) {
 	salt := make([]byte, 16)
 	_, err := rand.Read(salt)
 	return salt, err
