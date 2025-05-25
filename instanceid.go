@@ -97,7 +97,7 @@ func (c *Client) doRegister(ctx context.Context, androidId uint64, securityToken
 	values.Set("app", "org.chromium.linux")
 	values.Set("X-subtype", c.appId)
 	values.Set("device", strconv.FormatUint(androidId, 10))
-	values.Set("sender", fcmServerKey)
+	values.Set("sender", c.vapidKey)
 
 	res, err := c.post(ctx, registerURL, strings.NewReader(values.Encode()), func(header *http.Header) {
 		header.Set("Content-Type", "application/x-www-form-urlencoded")

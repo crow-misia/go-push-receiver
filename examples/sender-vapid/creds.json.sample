@@ -1,0 +1,5 @@
+{
+  "endpoint": "This file is a partial output of the credentials.json file from the receiver program.",
+  "publicKey": "If VAPID is used, these data are required instead of a registration token.",
+  "authSecret": ""
+}

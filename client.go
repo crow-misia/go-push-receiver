@@ -48,6 +48,7 @@ func New(config *Config, options ...ClientOption) *Client {
 		apiKey:    config.ApiKey,
 		projectId: config.ProjectId,
 		appId:     config.AppId,
+		vapidKey:  config.VapidKey,
 	}
 
 	for _, option := range options {
@@ -57,7 +58,7 @@ func New(config *Config, options ...ClientOption) *Client {
 	// set defaults
 	c.setDefaultOptions()
 
-	c.logger.Debug("Config", "apiKey", c.apiKey, "projectId", c.projectId, "appId", c.appId)
+	c.logger.Debug("Config", "apiKey", c.apiKey, "projectId", c.projectId, "appId", c.appId, "vapidKey", c.vapidKey)
 
 	return c
 }
@@ -111,6 +112,9 @@ func (c *Client) setDefaultOptions() {
 	}
 	if c.Events == nil {
 		c.Events = make(chan Event, 50)
+	}
+	if len(c.vapidKey) == 0 {
+		c.vapidKey = fcmServerKey
 	}
 }
 

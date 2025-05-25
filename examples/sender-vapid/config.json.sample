@@ -1,0 +1,5 @@
+{
+	"subscriber": "Sub in VAPID JWT token (exclude mailto:)",
+	"publicKey": "VAPID public key, passed in VAPID Authorization header",
+	"privateKey": "VAPID private key, used to sign VAPID JWT token"
+}

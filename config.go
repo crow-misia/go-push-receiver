@@ -12,4 +12,5 @@ type Config struct {
 	ApiKey    string `json:"apiKey"`
 	ProjectId string `json:"projectId"`
 	AppId     string `json:"appId"`
+	VapidKey  string `json:"VapidKey"`
 }
