@@ -38,7 +38,7 @@ type fcmRegisterRequest struct {
 }
 
 type fcmInstallRequest struct {
-	AppId       string `json:"appId"`
+	AppID       string `json:"appId"`
 	AuthVersion string `json:"authVersion"`
 	Fid         string `json:"fid"`
 	SdkVersion  string `json:"sdkVersion"`
@@ -58,8 +58,8 @@ type fcmInstallResponse struct {
 
 // FCMCredentials is Credentials for FCM
 type FCMCredentials struct {
-	AppId         string `json:"appId"`
-	AndroidId     uint64 `json:"androidId"`
+	AppID         string `json:"appId"`
+	AndroidID     uint64 `json:"androidId"`
 	Endpoint      string `json:"endpoint"`
 	SecurityToken uint64 `json:"securityToken"`
 	Token         string `json:"token"`
@@ -77,7 +77,7 @@ func (c *Client) Subscribe(ctx context.Context) {
 		if c.creds == nil {
 			err = c.register(ctx)
 		} else {
-			_, err = c.checkIn(ctx, &checkInOption{c.creds.AndroidId, c.creds.SecurityToken})
+			_, err = c.checkIn(ctx, &checkInOption{c.creds.AndroidID, c.creds.SecurityToken})
 		}
 		if err == nil {
 			// reset retry count when connection success
@@ -137,7 +137,7 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 	mcs := c.newMCS(conn)
 	defer mcs.disconnect("disconnect")
 
-	err = mcs.SendLoginPacket(c.receivedPersistentId)
+	err = mcs.SendLoginPacket(c.receivedPersistentID)
 	if err != nil {
 		return errors.Wrap(err, "send login packet failed")
 	}
@@ -199,11 +199,11 @@ func (c *Client) performRead(mcs *mcs) error {
 func (c *Client) onDataMessage(tagData proto.Message) error {
 	switch data := tagData.(type) {
 	case *pb.LoginResponse:
-		c.receivedPersistentId = nil
+		c.receivedPersistentID = nil
 		c.Events <- &ConnectedEvent{data.GetServerTimestamp()}
 	case *pb.DataMessageStanza:
 		// To avoid error loops, last streamId is notified even when an error occurs.
-		c.receivedPersistentId = append(c.receivedPersistentId, data.GetPersistentId())
+		c.receivedPersistentID = append(c.receivedPersistentID, data.GetPersistentId())
 		event, err := decryptData(data, c.creds)
 		if err != nil {
 			return err
@@ -221,7 +221,7 @@ func (c *Client) installFCM(ctx context.Context) (*fcmInstallResponse, error) {
 
 	// refs. https://github.com/firebase/firebase-js-sdk/blob/main/packages/installations/src/util/constants.ts#L22
 	body := fcmInstallRequest{
-		AppId:       c.appId,
+		AppID:       c.appID,
 		AuthVersion: authVersion,
 		Fid:         fid,
 		SdkVersion:  sdkVersion,
@@ -231,7 +231,7 @@ func (c *Client) installFCM(ctx context.Context) (*fcmInstallResponse, error) {
 		return nil, errors.Wrap(err, "marshal FCM install request")
 	}
 
-	url := fmt.Sprintf("%sprojects/%s/installations", firebaseInstallationURL, c.projectId)
+	url := fmt.Sprintf("%sprojects/%s/installations", firebaseInstallationURL, c.projectID)
 
 	res, err := c.post(ctx, url, bytes.NewReader(bodyBytes), func(header *http.Header) {
 		header.Set("Accept", "application/json")
@@ -282,7 +282,7 @@ func (c *Client) registerFCM(ctx context.Context, registerResponse *gcmRegisterR
 		return nil, errors.Wrap(err, "marshal FCM register request")
 	}
 
-	url := fmt.Sprintf("%sprojects/%s/registrations", firebaseRegistrationURL, c.projectId)
+	url := fmt.Sprintf("%sprojects/%s/registrations", firebaseRegistrationURL, c.projectID)
 
 	res, err := c.post(ctx, url, bytes.NewReader(bodyBytes), func(header *http.Header) {
 		header.Set("Content-Type", "application/json")
@@ -304,8 +304,8 @@ func (c *Client) registerFCM(ctx context.Context, registerResponse *gcmRegisterR
 	}
 
 	// set responses.
-	credentials.AppId = c.appId
-	credentials.AndroidId = registerResponse.androidId
+	credentials.AppID = c.appID
+	credentials.AndroidID = registerResponse.androidID
 	credentials.SecurityToken = registerResponse.securityToken
 	credentials.Token = fcmRegisterResponse.Token
 	credentials.Endpoint = endpoint

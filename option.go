@@ -30,10 +30,10 @@ func WithCreds(creds *FCMCredentials) ClientOption {
 	}
 }
 
-// WithReceivedPersistentId is received persistentId list setter
-func WithReceivedPersistentId(ids []string) ClientOption {
+// WithReceivedPersistentID is received persistentID list setter
+func WithReceivedPersistentID(ids []string) ClientOption {
 	return func(client *Client) {
-		client.receivedPersistentId = ids
+		client.receivedPersistentID = ids
 	}
 }
 

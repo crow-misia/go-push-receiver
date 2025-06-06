@@ -19,12 +19,12 @@ func main() {
 	var (
 		configFilename       string
 		credsFilename        string
-		persistentIdFilename string
+		persistentIDFilename string
 	)
 	flag.NewFlagSet("help", flag.ExitOnError)
 	flag.StringVar(&configFilename, "config", "config.json", "FCM's Config filename (needed)")
 	flag.StringVar(&credsFilename, "credentials", "credentials.json", "Credentials filename")
-	flag.StringVar(&persistentIdFilename, "persistent-id", "persistent_id.txt", "PersistentID filename")
+	flag.StringVar(&persistentIDFilename, "persistent-id", "persistent_id.txt", "PersistentID filename")
 	flag.Parse()
 
 	if len(configFilename) == 0 || len(credsFilename) == 0 {
@@ -33,10 +33,10 @@ func main() {
 	}
 
 	ctx := context.Background()
-	realMain(ctx, configFilename, credsFilename, persistentIdFilename)
+	realMain(ctx, configFilename, credsFilename, persistentIDFilename)
 }
 
-func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFilename string) {
+func realMain(ctx context.Context, configFilename, credsFilename, persistentIDFilename string) {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	config, err := loadConfig(configFilename)
@@ -51,8 +51,8 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 		os.Exit(-1)
 	}
 
-	// load received persistent ids
-	persistentIdList, err := loadPersistentIdList(persistentIdFilename)
+	// load received persistent id list
+	persistentIDList, err := loadPersistentIDList(persistentIDFilename)
 	if err != nil {
 		log.Error("failed load persistentID list", "message", err)
 		os.Exit(-1)
@@ -66,7 +66,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 			pr.WithAdaptive(true),
 		),
 		pr.WithLogger(log),
-		pr.WithReceivedPersistentId(persistentIdList),
+		pr.WithReceivedPersistentID(persistentIDList),
 	)
 
 	go fcmClient.Subscribe(ctx)
@@ -80,7 +80,7 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 				os.Exit(-1)
 			}
 		case *pr.ConnectedEvent:
-			if err := clearPersistentId(persistentIdFilename); err != nil {
+			if err := clearPersistentID(persistentIDFilename); err != nil {
 				log.Error("failed clear credentials", "message", err)
 				os.Exit(-1)
 			}
@@ -89,11 +89,11 @@ func realMain(ctx context.Context, configFilename, credsFilename, persistentIdFi
 		case *pr.HeartbeatError:
 			log.Warn("HeartbeatError", "message", err)
 		case *pr.MessageEvent:
-			log.Info("Received message:", "data", string(ev.Data), "persistentId", ev.PersistentId)
+			log.Info("Received message:", "data", string(ev.Data), "persistentID", ev.PersistentID)
 
-			// save persistentId
-			if err := savePersistentId(persistentIdFilename, ev.PersistentId); err != nil {
-				log.Error("failed save persistentId", "message", err)
+			// save persistentID
+			if err := savePersistentID(persistentIDFilename, ev.PersistentID); err != nil {
+				log.Error("failed save persistentID", "message", err)
 				os.Exit(-1)
 			}
 		case *pr.RetryEvent:
@@ -153,37 +153,37 @@ func saveCredentials(filename string, credentials *pr.FCMCredentials) error {
 	return encoder.Encode(credentials)
 }
 
-func loadPersistentIdList(filename string) ([]string, error) {
-	persistentIdList := make([]string, 0, 100)
+func loadPersistentIDList(filename string) ([]string, error) {
+	persistentIDList := make([]string, 0, 100)
 
 	if !isExist(filename) {
-		return persistentIdList, nil
+		return persistentIDList, nil
 	}
 
 	f, err := os.Open(filename)
 	if err != nil {
-		return persistentIdList, err
+		return persistentIDList, err
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
-		persistentIdList = append(persistentIdList, scanner.Text())
+		persistentIDList = append(persistentIDList, scanner.Text())
 	}
-	return persistentIdList, nil
+	return persistentIDList, nil
 }
 
-func savePersistentId(filename, persistentId string) error {
+func savePersistentID(filename, persistentID string) error {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	_, err = f.WriteString(fmt.Sprintln(persistentId))
+	_, err = f.WriteString(fmt.Sprintln(persistentID))
 	return err
 }
 
-func clearPersistentId(filename string) error {
+func clearPersistentID(filename string) error {
 	if isExist(filename) {
 		return os.Remove(filename)
 	}

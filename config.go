@@ -10,7 +10,7 @@ package pushreceiver
 // Config type
 type Config struct {
 	ApiKey    string `json:"apiKey"`
-	ProjectId string `json:"projectId"`
-	AppId     string `json:"appId"`
+	ProjectID string `json:"projectId"`
+	AppID     string `json:"appId"`
 	VapidKey  string `json:"VapidKey"`
 }

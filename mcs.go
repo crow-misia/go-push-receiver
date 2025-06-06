@@ -54,7 +54,7 @@ func (mcs *mcs) disconnect(reason string) {
 }
 
 func (mcs *mcs) SendLoginPacket(receivedPersistentId []string) error {
-	androidId := proto.String(strconv.FormatUint(mcs.creds.AndroidId, 10))
+	androidId := proto.String(strconv.FormatUint(mcs.creds.AndroidID, 10))
 
 	setting := []*pb.Setting{
 		{
@@ -75,7 +75,7 @@ func (mcs *mcs) SendLoginPacket(receivedPersistentId []string) error {
 		AuthToken:            proto.String(strconv.FormatUint(mcs.creds.SecurityToken, 10)),
 		Id:                   proto.String(fmt.Sprintf("chrome-%s", chromeVersion)),
 		Domain:               proto.String(mcsDomain),
-		DeviceId:             proto.String(fmt.Sprintf("android-%s", strconv.FormatUint(mcs.creds.AndroidId, 16))),
+		DeviceId:             proto.String(fmt.Sprintf("android-%s", strconv.FormatUint(mcs.creds.AndroidID, 16))),
 		NetworkType:          proto.Int32(1), // Wi-Fi
 		Resource:             androidId,
 		User:                 androidId,
