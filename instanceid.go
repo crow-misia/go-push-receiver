@@ -22,13 +22,13 @@ import (
 )
 
 type checkInOption struct {
-	androidId     uint64
+	androidID     uint64
 	securityToken uint64
 }
 
 type gcmRegisterResponse struct {
 	token         string
-	androidId     uint64
+	androidID     uint64
 	securityToken uint64
 }
 
@@ -41,7 +41,7 @@ func (c *Client) registerGCM(ctx context.Context) (*gcmRegisterResponse, error) 
 }
 
 func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCheckinResponse, error) {
-	id := int64(opt.androidId)
+	id := int64(opt.androidID)
 	r := &pb.AndroidCheckinRequest{
 		Checkin: &pb.AndroidCheckinProto{
 			ChromeBuild: &pb.ChromeBuildProto{
@@ -92,16 +92,16 @@ func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCh
 	return &responseProto, nil
 }
 
-func (c *Client) doRegister(ctx context.Context, androidId uint64, securityToken uint64) (*gcmRegisterResponse, error) {
+func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken uint64) (*gcmRegisterResponse, error) {
 	values := url.Values{}
 	values.Set("app", "org.chromium.linux")
-	values.Set("X-subtype", c.appId)
-	values.Set("device", strconv.FormatUint(androidId, 10))
+	values.Set("X-subtype", c.appID)
+	values.Set("device", strconv.FormatUint(androidID, 10))
 	values.Set("sender", c.vapidKey)
 
 	res, err := c.post(ctx, registerURL, strings.NewReader(values.Encode()), func(header *http.Header) {
 		header.Set("Content-Type", "application/x-www-form-urlencoded")
-		header.Set("Authorization", fmt.Sprintf("AidLogin %s:%s", strconv.FormatUint(androidId, 10), strconv.FormatUint(securityToken, 10)))
+		header.Set("Authorization", fmt.Sprintf("AidLogin %s:%s", strconv.FormatUint(androidID, 10), strconv.FormatUint(securityToken, 10)))
 		header.Set("User-Agent", "")
 	})
 	if err != nil {
@@ -122,7 +122,7 @@ func (c *Client) doRegister(ctx context.Context, androidId uint64, securityToken
 
 	return &gcmRegisterResponse{
 		token:         token,
-		androidId:     androidId,
+		androidID:     androidID,
 		securityToken: securityToken,
 	}, nil
 }

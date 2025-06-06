@@ -77,6 +77,6 @@ func realMain(ctx context.Context, credentialsFilename string, ttl int, registra
 		os.Exit(-1)
 	}
 
-	// Response is a message Id string.
+	// Response is a message ID string.
 	log.Info("Successfully sent message:", "response", response)
 }

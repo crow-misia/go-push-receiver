@@ -27,8 +27,8 @@ type httpClient interface {
 // Client is FCM Push receive client.
 type Client struct {
 	apiKey               string
-	projectId            string
-	appId                string
+	projectID            string
+	appID                string
 	vapidKey             string
 	logger               *slog.Logger
 	httpClient           httpClient
@@ -37,7 +37,7 @@ type Client struct {
 	dialer               *net.Dialer
 	backoff              *Backoff
 	heartbeat            *Heartbeat
-	receivedPersistentId []string
+	receivedPersistentID []string
 	retryDisabled        bool
 	Events               chan Event
 }
@@ -46,8 +46,8 @@ type Client struct {
 func New(config *Config, options ...ClientOption) *Client {
 	c := &Client{
 		apiKey:    config.ApiKey,
-		projectId: config.ProjectId,
-		appId:     config.AppId,
+		projectID: config.ProjectID,
+		appID:     config.AppID,
 		vapidKey:  config.VapidKey,
 	}
 
@@ -58,7 +58,7 @@ func New(config *Config, options ...ClientOption) *Client {
 	// set defaults
 	c.setDefaultOptions()
 
-	c.logger.Debug("Config", "apiKey", c.apiKey, "projectId", c.projectId, "appId", c.appId, "vapidKey", c.vapidKey)
+	c.logger.Debug("Config", "apiKey", c.apiKey, "projectID", c.projectID, "appID", c.appID, "vapidKey", c.vapidKey)
 
 	return c
 }

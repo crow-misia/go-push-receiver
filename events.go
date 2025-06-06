@@ -46,7 +46,7 @@ type UpdateCredentialsEvent struct {
 
 // MessageEvent is received message event.
 type MessageEvent struct {
-	PersistentId string `json:"persistentId"`
+	PersistentID string `json:"persistentId"`
 	From         string `json:"from"`
 	To           string `json:"to"`
 	TTL          int32  `json:"ttl"`
@@ -56,7 +56,7 @@ type MessageEvent struct {
 
 func newMessageEvent(data *pb.DataMessageStanza, bytes []byte) *MessageEvent {
 	return &MessageEvent{
-		PersistentId: data.GetPersistentId(),
+		PersistentID: data.GetPersistentId(),
 		From:         data.GetFrom(),
 		To:           data.GetTo(),
 		TTL:          data.GetTtl(),
