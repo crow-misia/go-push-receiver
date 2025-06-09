@@ -1,5 +1,5 @@
-github.com/crow-misia/http-ece v0.2.0 h1:NcRWegUZX/QelTIiiN/yKZiQmP/vDmxtJkFlNlDUzLg=
-github.com/crow-misia/http-ece v0.2.0/go.mod h1:4ANcJNhCUblrZzriU02N5ggN3KTHAu1H6ge53gZn/OU=
+github.com/crow-misia/http-ece v0.2.1 h1:iGJDOF9EK+YN2oLPamnC+JUzgGn5efvchCUByLtN1hE=
+github.com/crow-misia/http-ece v0.2.1/go.mod h1:4ANcJNhCUblrZzriU02N5ggN3KTHAu1H6ge53gZn/OU=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
