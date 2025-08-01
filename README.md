@@ -13,6 +13,8 @@ This library was developed inspired by push-receiver (https://github.com/Matthie
 
 1. install protoc
 
+use mise or 
+
 ```shell
 brew install protobuf
 ```
