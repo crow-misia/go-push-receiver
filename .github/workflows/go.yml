@@ -5,28 +5,44 @@ on:
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: read
-
 jobs:
   build:
-    timeout-minutes: 30
     name: Build
+
+    timeout-minutes: 30
+
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         go-version: ['1.21', '1.22', '1.23', '1.24']
+
+    permissions:
+      contents: write
+
     steps:
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ github.head_ref }}
 
-    - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: ${{ matrix.go-version }}
 
-    - name: Get dependencies
-      run: go get -v -t -d
+      - name: Get dependencies
+        run: go get -v -t -d
 
-    - name: Build
-      run: go build
+      - name: Check goimports
+        run: go run golang.org/x/tools/cmd/goimports@latest -w .
+
+      - name: Build
+        run: go build
+
+      - name: Commit changes
+        if: ${{ matrix.go-version == '1.24' && github.event_name == 'pull_request' }}
+        uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v6.0.1
+        with:
+          commit_options: "--no-verify --signoff"
+          commit_message: "ci: apply formatting changes"
