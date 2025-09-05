@@ -2,7 +2,7 @@ module github.com/crow-misia/go-push-receiver
 
 go 1.23.0
 
-toolchain go1.24.3
+toolchain go1.25.1
 
 require (
 	github.com/crow-misia/http-ece v0.2.1
