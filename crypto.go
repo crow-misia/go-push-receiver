@@ -11,6 +11,7 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
+
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 	ece "github.com/crow-misia/http-ece"
 	"github.com/pkg/errors"

@@ -11,12 +11,13 @@ package pushreceiver
 import (
 	"context"
 	"crypto/tls"
-	"github.com/pkg/errors"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // httpClient defines the minimal interface needed for an http.Client to be implemented.

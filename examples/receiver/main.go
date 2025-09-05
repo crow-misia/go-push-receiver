@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/pkg/errors"
 	"log/slog"
 	"os"
 	"reflect"
 	"time"
+
+	"github.com/pkg/errors"
 
 	pr "github.com/crow-misia/go-push-receiver"
 )

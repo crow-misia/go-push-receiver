@@ -15,9 +15,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"net/http"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 	"github.com/pkg/errors"

@@ -10,16 +10,17 @@ package pushreceiver
 import (
 	"crypto/tls"
 	"fmt"
-	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
-	"github.com/pkg/errors"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/encoding/protowire"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"log/slog"
 	"strconv"
 	"sync"
 	"time"
+
+	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 )
 
 type mcs struct {

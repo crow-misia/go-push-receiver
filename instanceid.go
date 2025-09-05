@@ -11,14 +11,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	pb "github.com/crow-misia/go-push-receiver/pb/checkin"
-	"github.com/pkg/errors"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+
+	pb "github.com/crow-misia/go-push-receiver/pb/checkin"
+	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 type checkInOption struct {

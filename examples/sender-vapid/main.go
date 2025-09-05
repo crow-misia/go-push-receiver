@@ -6,11 +6,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/SherClockHolmes/webpush-go"
 	"io"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/SherClockHolmes/webpush-go"
 )
 
 var log = slog.Default()
