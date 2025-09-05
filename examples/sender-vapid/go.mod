@@ -2,7 +2,7 @@ module sender-vapid
 
 go 1.23.0
 
-toolchain go1.24.3
+toolchain go1.25.1
 
 require github.com/SherClockHolmes/webpush-go v1.4.0
 
