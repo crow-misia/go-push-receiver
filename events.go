@@ -8,8 +8,9 @@
 package pushreceiver
 
 import (
-	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 	"time"
+
+	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 )
 
 // Event type.

@@ -9,6 +9,7 @@ package pushreceiver
 
 import (
 	"fmt"
+
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 	"google.golang.org/protobuf/proto"
 )
