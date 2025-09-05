@@ -109,7 +109,7 @@ func (c *Client) setDefaultOptions() {
 		}
 	}
 	if c.logger == nil {
-		c.logger = slog.New(slog.DiscardHandler)
+		c.logger = slog.New(noOpHandler{})
 	}
 	if c.Events == nil {
 		c.Events = make(chan Event, 50)
