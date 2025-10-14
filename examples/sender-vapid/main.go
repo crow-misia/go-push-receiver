@@ -36,7 +36,7 @@ func main() {
 	)
 	flag.NewFlagSet("help", flag.ExitOnError)
 	flag.IntVar(&ttl, "ttl", 86400, "Message TTL. zero or negative is disable")
-	flag.StringVar(&credsFilename, "credentials", "", "subscriber's credentials filename")
+	flag.StringVar(&credsFilename, "credentials", "credentials.json", "subscriber's credentials filename")
 	flag.StringVar(&configFilename, "config", "config.json", "vapid config filename")
 	flag.Parse()
 	if len(configFilename) == 0 && len(credsFilename) == 0 {
@@ -87,6 +87,7 @@ func realMain(ctx context.Context, credsFilename, configFilename string, ttl int
 		VAPIDPublicKey:  config.VAPIDPublicKey,
 		VAPIDPrivateKey: config.VAPIDPrivateKey,
 		TTL:             ttl,
+		RecordSize:      uint32(len(messageBytes) + 16 + 4 + 1 + 65 + 1 + 16), // 16(salt) + 4(record size) + 1(key size) + 65(public key) + message + 1(padding) + 16
 	})
 	if err != nil {
 		log.Error("error: %v", err)
