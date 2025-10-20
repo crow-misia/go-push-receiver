@@ -5,44 +5,35 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Build
-
     timeout-minutes: 30
-
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         go-version: ['1.24', '1.25']
 
-    permissions:
-      contents: write
-
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ github.head_ref }}
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: ${{ matrix.go-version }}
 
-      - name: Get dependencies
-        run: go get -v -t -d
-
-      - name: Check goimports
-        run: go run golang.org/x/tools/cmd/goimports@latest -w .
+      - name: Install Go dependencies
+        run: go get -t
 
       - name: Build
         run: go build
-
-      - name: Commit changes
-        if: ${{ matrix.go-version == '1.25' && github.event_name == 'pull_request' }}
-        uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v6.0.1
-        with:
-          commit_options: "--no-verify --signoff"
-          commit_message: "ci: apply formatting changes"
