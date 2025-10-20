@@ -157,6 +157,15 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# Node.js
+node_modules/
+
+# Lefthook
+lefthook-local.*
+
+# mise
+mise.local.toml
+
 # Files for testing.
 serviceAccountKey.json
 credentials.json
