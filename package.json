@@ -1,7 +1,6 @@
 {
   "private": true,
   "scripts": {
-    "preinstall": "pnpm dlx only-allow pnpm",
     "ncu": "npm-check-updates -u"
   },
   "dependencies": {
@@ -9,8 +8,5 @@
     "@commitlint/config-conventional": "20.0.0",
     "lefthook": "2.0.4",
     "npm-check-updates": "19.1.2"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["lefthook"]
   }
 }
