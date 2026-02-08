@@ -17,7 +17,7 @@ pre-commit:
   commands:
     gofmt:
       glob: "*.go"
-      run: gofmt -w {staged_files}
+      run: mise exec -- gofmt -w {staged_files}
       stage_fixed: true
       skip:
         - merge
@@ -25,7 +25,7 @@ pre-commit:
 
     goimports:
       glob: "*.go"
-      run: go tool goimports -w {staged_files}
+      run: mise exec -- go tool goimports -w {staged_files}
       stage_fixed: true
       skip:
         - merge
