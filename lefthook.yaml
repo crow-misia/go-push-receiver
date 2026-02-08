@@ -8,7 +8,9 @@ commit-msg:
   parallel: true
   commands:
     lint:
-      run: pnpm exec commitlint --edit {1}
+      run: |
+        CONFIG_PATH=$(mise where npm:@commitlint/config-conventional)/lib/node_modules/@commitlint/config-conventional/lib/index.js
+        mise exec -- commitlint --extends "$CONFIG_PATH" --edit {1}
 
 pre-commit:
   parallel: false
