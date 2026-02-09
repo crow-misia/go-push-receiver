@@ -1,5 +1,6 @@
 [tools]
 go = "latest"
+lefthook = "latest"
 node = "24"
 "npm:@commitlint/cli" = "latest"
 "npm:@commitlint/config-conventional" = "latest"
