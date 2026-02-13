@@ -11,12 +11,11 @@ This library was developed inspired by push-receiver (https://github.com/Matthie
 
 ## Build
 
-1. install protoc
-
-use mise or 
+1. prepare
 
 ```shell
-brew install protobuf
+mise install
+lefthook install
 ```
 
 2. build

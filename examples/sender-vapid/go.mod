@@ -1,12 +1,10 @@
 module sender-vapid
 
-go 1.24.0
-
-toolchain go1.25.2
+go 1.25.0
 
 require github.com/SherClockHolmes/webpush-go v1.4.0
 
 require (
-	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
 )
