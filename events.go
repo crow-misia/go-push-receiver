@@ -14,7 +14,7 @@ import (
 )
 
 // Event type.
-type Event interface{}
+type Event any
 
 // ConnectedEvent is connection event.
 type ConnectedEvent struct {

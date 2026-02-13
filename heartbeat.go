@@ -35,11 +35,7 @@ func WithClientInterval(interval time.Duration) HeartbeatOption {
 func WithServerInterval(interval time.Duration) HeartbeatOption {
 	return func(heartbeat *Heartbeat) {
 		// minimum 1 minute
-		if interval > 1*time.Minute {
-			heartbeat.serverInterval = interval
-		} else {
-			heartbeat.serverInterval = 1 * time.Minute
-		}
+		heartbeat.serverInterval = max(interval, 1*time.Minute)
 	}
 }
 

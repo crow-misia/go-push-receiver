@@ -32,15 +32,8 @@ func NewBackoff(base time.Duration, max time.Duration) *Backoff {
 func (b *Backoff) duration() time.Duration {
 	b.attempts++
 
-	n := 1 << uint(b.attempts) * b.base
-	if n < 0 {
-		n = 0
-	}
-	duration := rand.Int63n(n)
-
-	if duration > b.max {
-		duration = b.max
-	}
+	n := max(1<<uint(b.attempts)*b.base, 0)
+	duration := min(rand.Int63n(n), b.max)
 	return time.Duration(duration)
 }
 

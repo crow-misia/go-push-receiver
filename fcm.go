@@ -29,10 +29,10 @@ type authToken struct {
 }
 
 type fcmWebpush struct {
-	ApplicationPubKey string      `json:"applicationPubKey,omitempty"`
-	Endpoint          interface{} `json:"endpoint"`
-	P256Dh            interface{} `json:"p256dh"`
-	Auth              interface{} `json:"auth"`
+	ApplicationPubKey string `json:"applicationPubKey,omitempty"`
+	Endpoint          any    `json:"endpoint"`
+	P256Dh            any    `json:"p256dh"`
+	Auth              any    `json:"auth"`
 }
 type fcmRegisterRequest struct {
 	Web fcmWebpush `json:"web"`
