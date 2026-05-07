@@ -1,4 +1,5 @@
 [tools]
+gitleaks = "latest"
 go = "latest"
 lefthook = "latest"
 node = "24"
