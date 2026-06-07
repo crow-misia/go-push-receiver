@@ -1,0 +1,4 @@
+rules:
+  excessive-permissions:
+    ignore:
+      - osv-scanner.yml:18

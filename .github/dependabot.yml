@@ -7,7 +7,7 @@ updates:
         patterns:
           - "*"
     schedule:
-      interval: "daily"
+      interval: "monthly"
     cooldown:
       default-days: 7
   - package-ecosystem: "gomod"
@@ -17,6 +17,6 @@ updates:
         patterns:
           - "*"
     schedule:
-      interval: "daily"
+      interval: "monthly"
     cooldown:
       default-days: 7
