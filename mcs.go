@@ -8,13 +8,13 @@
 package pushreceiver
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
 	"log/slog"
 	"strconv"
 	"sync"
-	"time"
 
 	pb "github.com/crow-misia/go-push-receiver/pb/mcs"
 	"github.com/pkg/errors"
@@ -27,7 +27,6 @@ type mcs struct {
 	conn             *tls.Conn
 	logger           *slog.Logger
 	creds            *FCMCredentials
-	writeTimeout     time.Duration
 	incomingStreamId int32
 	heartbeatAck     chan bool
 	heartbeat        *Heartbeat
@@ -54,8 +53,8 @@ func (mcs *mcs) disconnect(reason string) {
 	})
 }
 
-func (mcs *mcs) SendLoginPacket(receivedPersistentId []string) error {
-	androidId := proto.String(strconv.FormatUint(mcs.creds.AndroidID, 10))
+func (mcs *mcs) SendLoginPacket(ctx context.Context, receivedPersistentId []string) error {
+	androidId := proto.String(strconv.FormatInt(mcs.creds.AndroidID, 10))
 
 	setting := []*pb.Setting{
 		{
@@ -76,7 +75,7 @@ func (mcs *mcs) SendLoginPacket(receivedPersistentId []string) error {
 		AuthToken:            proto.String(strconv.FormatUint(mcs.creds.SecurityToken, 10)),
 		Id:                   proto.String(fmt.Sprintf("chrome-%s", chromeVersion)),
 		Domain:               proto.String(mcsDomain),
-		DeviceId:             proto.String(fmt.Sprintf("android-%s", strconv.FormatUint(mcs.creds.AndroidID, 16))),
+		DeviceId:             proto.String(fmt.Sprintf("android-%s", strconv.FormatInt(mcs.creds.AndroidID, 16))),
 		NetworkType:          proto.Int32(1), // Wi-Fi
 		Resource:             androidId,
 		User:                 androidId,
@@ -87,28 +86,28 @@ func (mcs *mcs) SendLoginPacket(receivedPersistentId []string) error {
 		ReceivedPersistentId: receivedPersistentId,
 	}
 
-	return mcs.sendRequest(tagLoginRequest, request, true)
+	return mcs.sendRequest(ctx, tagLoginRequest, request, true)
 }
 
-func (mcs *mcs) SendHeartbeatPingPacket() error {
+func (mcs *mcs) SendHeartbeatPingPacket(ctx context.Context) error {
 	streamId := mcs.incomingStreamId
 	request := &pb.HeartbeatPing{
 		LastStreamIdReceived: proto.Int32(streamId),
 	}
 
-	return mcs.sendRequest(tagHeartbeatPing, request, false)
+	return mcs.sendRequest(ctx, tagHeartbeatPing, request, false)
 }
 
-func (mcs *mcs) SendHeartbeatAckPacket() error {
+func (mcs *mcs) SendHeartbeatAckPacket(ctx context.Context) error {
 	streamId := mcs.incomingStreamId
 	request := &pb.HeartbeatAck{
 		LastStreamIdReceived: proto.Int32(streamId),
 	}
 
-	return mcs.sendRequest(tagHeartbeatAck, request, false)
+	return mcs.sendRequest(ctx, tagHeartbeatAck, request, false)
 }
 
-func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion bool) error {
+func (mcs *mcs) sendRequest(ctx context.Context, tag tagType, request proto.Message, containVersion bool) error {
 	header := make([]byte, 0, 100)
 	if containVersion {
 		header = append(header, fcmVersion, byte(tag))
@@ -116,11 +115,15 @@ func (mcs *mcs) sendRequest(tag tagType, request proto.Message, containVersion b
 		header = append(header, byte(tag))
 	}
 
-	if mcs.logger.Enabled(nil, slog.LevelDebug) {
+	if mcs.logger.Enabled(ctx, slog.LevelDebug) {
 		mcs.logger.Debug("MCS request", "tag", tag, "message", protojson.MarshalOptions{Multiline: false}.Format(request))
 	}
 
-	header = protowire.AppendVarint(header, uint64(proto.Size(request)))
+	requestSize := proto.Size(request)
+	if requestSize < 0 {
+		return fmt.Errorf("invalid request size %d", requestSize)
+	}
+	header = protowire.AppendVarint(header, uint64(requestSize))
 	data, err := proto.Marshal(request)
 	if err != nil {
 		return errors.Wrap(err, "encode protocol buffer data")
@@ -143,7 +146,7 @@ func (mcs *mcs) ReceiveVersion() error {
 	return nil
 }
 
-func (mcs *mcs) PerformReadTag() (proto.Message, error) {
+func (mcs *mcs) PerformReadTag(ctx context.Context) (proto.Message, error) {
 	var err error
 
 	// receive tag
@@ -165,10 +168,10 @@ func (mcs *mcs) PerformReadTag() (proto.Message, error) {
 		return nil, errors.Wrap(err, "receive data packet")
 	}
 
-	return mcs.UnmarshalTagData(tag, buf)
+	return mcs.UnmarshalTagData(ctx, tag, buf)
 }
 
-func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (proto.Message, error) {
+func (mcs *mcs) UnmarshalTagData(ctx context.Context, tag tagType, buf []byte) (proto.Message, error) {
 	receive := tag.GenerateMessage()
 	if receive == nil {
 		return nil, errors.Errorf("unknown tag: %x", tag)
@@ -179,31 +182,31 @@ func (mcs *mcs) UnmarshalTagData(tag tagType, buf []byte) (proto.Message, error)
 	}
 
 	// output receive
-	if mcs.logger.Enabled(nil, slog.LevelDebug) {
+	if mcs.logger.Enabled(ctx, slog.LevelDebug) {
 		mcs.logger.Debug("MCS receive", "tag", tag, "message", protojson.MarshalOptions{Multiline: false}.Format(receive))
 	}
 
 	// handling tag
-	if err := mcs.handleTag(receive); err != nil {
+	if err := mcs.handleTag(ctx, receive); err != nil {
 		return receive, errors.Wrap(err, "handling failed.")
 	}
 
 	return receive, nil
 }
 
-func (mcs *mcs) handleTag(receive proto.Message) error {
-	switch receive.(type) {
+func (mcs *mcs) handleTag(ctx context.Context, receive proto.Message) error {
+	switch data := receive.(type) {
 	case *pb.HeartbeatPing:
-		mcs.updateIncomingStreamId((*receive.(*pb.HeartbeatPing)).GetLastStreamIdReceived())
+		mcs.updateIncomingStreamId(data.GetLastStreamIdReceived())
 		mcs.heartbeatAck <- true
-		return mcs.SendHeartbeatAckPacket()
+		return mcs.SendHeartbeatAckPacket(ctx)
 	case *pb.HeartbeatAck:
-		mcs.updateIncomingStreamId((*receive.(*pb.HeartbeatAck)).GetLastStreamIdReceived())
+		mcs.updateIncomingStreamId(data.GetLastStreamIdReceived())
 		mcs.heartbeatAck <- true
 	case *pb.LoginResponse:
-		mcs.updateIncomingStreamId((*receive.(*pb.LoginResponse)).GetLastStreamIdReceived())
+		mcs.updateIncomingStreamId(data.GetLastStreamIdReceived())
 	case *pb.IqStanza:
-		mcs.updateIncomingStreamId((*receive.(*pb.IqStanza)).GetLastStreamIdReceived())
+		mcs.updateIncomingStreamId(data.GetLastStreamIdReceived())
 	}
 	return nil
 }

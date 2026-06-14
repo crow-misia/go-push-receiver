@@ -119,8 +119,20 @@ func (c *Client) setDefaultOptions() {
 	}
 }
 
-func closeResponse(res *http.Response) error {
-	defer res.Body.Close()
-	_, err := io.Copy(io.Discard, res.Body)
-	return err
+func closeResponse(logger *slog.Logger, res *http.Response) {
+	if res == nil || res.Body == nil {
+		return
+	}
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			logger.Debug("failed to discard response body", slog.Any("error", err))
+		}
+	}()
+
+	if _, err := io.Copy(io.Discard, res.Body); err != nil {
+		logger.Debug("failed to discard response body", slog.Any("error", err))
+
+		res.Close = true
+	}
 }

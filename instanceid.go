@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -23,13 +24,13 @@ import (
 )
 
 type checkInOption struct {
-	androidID     uint64
+	androidID     int64
 	securityToken uint64
 }
 
 type gcmRegisterResponse struct {
 	token         string
-	androidID     uint64
+	androidID     int64
 	securityToken uint64
 }
 
@@ -38,11 +39,16 @@ func (c *Client) registerGCM(ctx context.Context) (*gcmRegisterResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-	return c.doRegister(ctx, *checkInResp.AndroidId, *checkInResp.SecurityToken)
+
+	androidID := *checkInResp.AndroidId
+	if androidID > math.MaxInt64 {
+		return nil, fmt.Errorf("invalid Android ID %d", androidID)
+	}
+	return c.doRegister(ctx, int64(androidID), *checkInResp.SecurityToken)
 }
 
-func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCheckinResponse, error) {
-	id := int64(opt.androidID)
+func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (resp *pb.AndroidCheckinResponse, err error) {
+	id := opt.androidID
 	r := &pb.AndroidCheckinRequest{
 		Checkin: &pb.AndroidCheckinProto{
 			ChromeBuild: &pb.ChromeBuildProto{
@@ -71,7 +77,7 @@ func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCh
 	if err != nil {
 		return nil, errors.Wrap(err, "request GCM checkin")
 	}
-	defer closeResponse(res)
+	defer closeResponse(c.logger, res)
 
 	// unauthorized error
 	if res.StatusCode == http.StatusUnauthorized {
@@ -93,22 +99,24 @@ func (c *Client) checkIn(ctx context.Context, opt *checkInOption) (*pb.AndroidCh
 	return &responseProto, nil
 }
 
-func (c *Client) doRegister(ctx context.Context, androidID uint64, securityToken uint64) (*gcmRegisterResponse, error) {
+func (c *Client) doRegister(ctx context.Context, androidID int64, securityToken uint64) (resp *gcmRegisterResponse, err error) {
+	device := strconv.FormatInt(androidID, 10)
+
 	values := url.Values{}
 	values.Set("app", "org.chromium.linux")
 	values.Set("X-subtype", c.appID)
-	values.Set("device", strconv.FormatUint(androidID, 10))
+	values.Set("device", device)
 	values.Set("sender", c.vapidKey)
 
 	res, err := c.post(ctx, registerURL, strings.NewReader(values.Encode()), func(header *http.Header) {
 		header.Set("Content-Type", "application/x-www-form-urlencoded")
-		header.Set("Authorization", fmt.Sprintf("AidLogin %s:%s", strconv.FormatUint(androidID, 10), strconv.FormatUint(securityToken, 10)))
+		header.Set("Authorization", fmt.Sprintf("AidLogin %s:%s", device, strconv.FormatUint(securityToken, 10)))
 		header.Set("User-Agent", "")
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "request GCM register")
 	}
-	defer closeResponse(res)
+	defer closeResponse(c.logger, res)
 
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
