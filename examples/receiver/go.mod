@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/crow-misia/http-ece v0.6.0 // indirect
+	github.com/crow-misia/http-ece v0.7.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 

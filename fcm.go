@@ -60,7 +60,7 @@ type fcmInstallResponse struct {
 // FCMCredentials is Credentials for FCM
 type FCMCredentials struct {
 	AppID         string `json:"appId"`
-	AndroidID     uint64 `json:"androidId"`
+	AndroidID     int64  `json:"androidId"`
 	Endpoint      string `json:"endpoint"`
 	SecurityToken uint64 `json:"securityToken"`
 	Token         string `json:"token"`
@@ -125,7 +125,7 @@ func (c *Client) register(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) tryToConnect(ctx context.Context) error {
+func (c *Client) tryToConnect(ctx context.Context) (err error) {
 	childCtx, cancelChild := context.WithCancel(ctx)
 	defer cancelChild()
 
@@ -133,12 +133,16 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "dial failed to FCM")
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	mcs := c.newMCS(conn)
 	defer mcs.disconnect("disconnect")
 
-	err = mcs.SendLoginPacket(c.receivedPersistentID)
+	err = mcs.SendLoginPacket(ctx, c.receivedPersistentID)
 	if err != nil {
 		return errors.Wrap(err, "send login packet failed")
 	}
@@ -149,7 +153,7 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 		c.logger,
 		mcs.heartbeatAck,
 		func() error {
-			return mcs.SendHeartbeatPingPacket()
+			return mcs.SendHeartbeatPingPacket(ctx)
 		},
 		func() {
 			mcs.disconnect("heartbeat")
@@ -157,23 +161,23 @@ func (c *Client) tryToConnect(ctx context.Context) error {
 		})
 
 	select {
-	case err := <-c.asyncPerformRead(mcs):
+	case err = <-c.asyncPerformRead(ctx, mcs):
 		return err
 	case <-childCtx.Done():
 		return childCtx.Err()
 	}
 }
 
-func (c *Client) asyncPerformRead(mcs *mcs) <-chan error {
+func (c *Client) asyncPerformRead(ctx context.Context, mcs *mcs) <-chan error {
 	ch := make(chan error)
 	go func() {
 		defer close(ch)
-		ch <- c.performRead(mcs)
+		ch <- c.performRead(ctx, mcs)
 	}()
 	return ch
 }
 
-func (c *Client) performRead(mcs *mcs) error {
+func (c *Client) performRead(ctx context.Context, mcs *mcs) error {
 	// receive version
 	err := mcs.ReceiveVersion()
 	if err != nil {
@@ -182,7 +186,7 @@ func (c *Client) performRead(mcs *mcs) error {
 
 	for {
 		// receive tag
-		data, err := mcs.PerformReadTag()
+		data, err := mcs.PerformReadTag(ctx)
 		if err != nil {
 			return errors.Wrap(err, "receive tag failed")
 		}
@@ -246,7 +250,7 @@ func (c *Client) installFCM(ctx context.Context) (*fcmInstallResponse, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "request FCM install")
 	}
-	defer closeResponse(res)
+	defer closeResponse(c.logger, res)
 
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return nil, errors.Errorf("server error: %s", res.Status)
@@ -293,7 +297,7 @@ func (c *Client) registerFCM(ctx context.Context, registerResponse *gcmRegisterR
 	if err != nil {
 		return nil, errors.Wrap(err, "request FCM register")
 	}
-	defer closeResponse(res)
+	defer closeResponse(c.logger, res)
 
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return nil, errors.Errorf("server error: %s", res.Status)

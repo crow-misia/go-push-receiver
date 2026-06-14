@@ -20,14 +20,14 @@ pre-commit:
       run: mise exec -- gitleaks git --pre-commit --staged --no-color --no-banner --verbose
     gofmt:
       glob: "*.go"
-      run: mise exec -- gofmt -w {staged_files}
+      run: mise exec -- golangci-lint fmt {staged_files}
       stage_fixed: true
       skip:
         - merge
         - rebase
-    goimports:
+    golangci-lint:
       glob: "*.go"
-      run: mise exec -- go tool goimports -w {staged_files}
+      run: mise exec -- golangci-lint run --new-from-rev=HEAD ./...
       stage_fixed: true
       skip:
         - merge

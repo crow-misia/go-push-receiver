@@ -8,7 +8,9 @@
 package pushreceiver
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"encoding/binary"
+	"math"
 	"time"
 )
 
@@ -31,9 +33,29 @@ func NewBackoff(base time.Duration, max time.Duration) *Backoff {
 
 func (b *Backoff) duration() time.Duration {
 	b.attempts++
+	if b.attempts > 62 {
+		b.attempts = 62
+	}
+	n := (1 << uint(b.attempts)) * b.base
+	if n <= 0 {
+		n = math.MaxInt64
+	}
 
-	n := max(1<<uint(b.attempts)*b.base, 0)
-	duration := min(rand.Int63n(n), b.max)
+	var duration int64
+	if n > 1 {
+		var buf [8]byte
+		if _, err := rand.Read(buf[:]); err != nil {
+			duration = 0
+		} else {
+			tmpUint64 := binary.BigEndian.Uint64(buf[:])
+			tmpInt64 := int64(tmpUint64 & 0x7FFFFFFFFFFFFFFF)
+			duration = tmpInt64 % n
+		}
+	}
+	if duration > b.max {
+		duration = b.max
+	}
+
 	return time.Duration(duration)
 }
 
