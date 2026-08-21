@@ -1,0 +1,3 @@
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "x/crypto/openpgpは使用していないため"

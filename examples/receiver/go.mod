@@ -1,6 +1,6 @@
 module receiver
 
-go 1.25.11
+go 1.25.14
 
 require (
 	github.com/crow-misia/go-push-receiver v0.0.0
@@ -9,7 +9,7 @@ require (
 
 require (
 	github.com/crow-misia/http-ece v0.7.1 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 )
 
 replace github.com/crow-misia/go-push-receiver => ../../
