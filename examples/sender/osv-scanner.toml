@@ -1,3 +1,11 @@
 [[IgnoredVulns]]
 id = "GO-2026-5932"
 reason = "x/crypto/openpgpは使用していないため"
+
+[[IgnoredVulns]]
+id = "GO-2026-6354"
+reason = "x/crypto/sshは使用していないため"
+
+[[IgnoredVulns]]
+id = "GO-2026-6355"
+reason = "x/crypto/sshは使用していないため"
