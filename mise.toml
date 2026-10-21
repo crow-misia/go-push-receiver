@@ -1,5 +1,6 @@
 [settings]
 minimum_release_age = "7d"
+minimum_release_age_excludes = ["node", "go"]
 
 [tools]
 gitleaks = "latest"
